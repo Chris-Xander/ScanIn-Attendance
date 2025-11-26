@@ -1,0 +1,253 @@
+/* Admin Reports Styles */
+.admin-reports-container {
+  padding: 2rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f9fafb;
+  min-height: 100vh;
+  border-radius: 25px;
+}
+
+/* QR Gate Reports List */
+.qr-gate-reports-list {
+    margin-bottom: 30px;
+}
+
+.qr-gate-report-item {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.report-info {
+    flex: 1;
+}
+
+.report-info h3 {
+    margin: 0 0 10px 0;
+    color: #2796c3;
+    font-size: 1.2em;
+}
+
+.report-info p {
+    margin: 5px 0;
+    color: #555;
+    font-size: 0.9em;
+}
+
+.form-fields-info {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.form-fields-info ul {
+    margin: 5px 0 0 0;
+    padding-left: 20px;
+}
+
+.form-fields-info li {
+    margin: 2px 0;
+    color: #666;
+    font-size: 0.85em;
+}
+
+.report-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 120px;
+}
+
+.report-actions button {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.view-btn {
+    background: #2796c3;
+    color: white;
+}
+
+.view-btn:hover {
+    background: #1e7ba8;
+}
+
+.toggle-status-btn {
+    background: #ffc107;
+    color: #333;
+}
+
+.toggle-status-btn:hover {
+    background: #e0a800;
+}
+
+.delete-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.delete-btn:hover {
+    background: #c82333;
+}
+
+/* Loading and Empty States */
+.loading-state,
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 30px;
+}
+
+.loading-state p,
+.empty-state p {
+    color: #666;
+    font-size: 1.1em;
+    margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .qr-gate-report-item {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .report-actions {
+        flex-direction: row;
+        justify-content: space-between;
+        min-width: auto;
+    }
+
+    .report-actions button {
+        flex: 1;
+        text-align: center;
+    }
+}
+.db-section-spacing {
+  margin-top: 2rem;
+}
+
+.db-date-fields {
+  display: flex;
+  gap: 1rem;
+}
+
+.db-date-field {
+  flex: 1;
+}
+
+.admin-db-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 30px;
+  max-width: 700px;
+  width: 100%;
+  height: 500px;
+}
+
+/* Enhanced Table Styles */
+.attendance-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  font-size: 0.85rem;
+  padding: 10px;
+}
+
+.attendance-table thead {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  color: white;
+}
+
+.attendance-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.attendance-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e3e8ee;
+  font-size: 0.8rem;
+  word-wrap: break-word;
+  max-width: 200px;
+}
+
+.attendance-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.form-data-details {
+  cursor: pointer;
+  color: #2196f3;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.form-data-content {
+  padding: 0.5rem;
+  background: #f5f5f5;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.form-data-item {
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.form-data-item strong {
+  color: #1976d2;
+  font-weight: 600;
+}
+
+/* Mobile Responsive for Reports */
+@media (max-width: 600px) {
+  .db-date-fields {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .db-section-spacing {
+    margin-top: 1.2rem;
+  }
+}
+
+@media (max-width: 415px) {
+  .attendance-table {
+    font-size: 0.75rem;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .attendance-table th,
+  .attendance-table td {
+    padding: 0.5rem;
+    min-width: 100px;
+  }
+}

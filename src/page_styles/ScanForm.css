@@ -1,0 +1,340 @@
+/*
+	ScanForm page styles
+	- Professional styling for the ScanForm page to match the app's theme
+	- Uses CSS variables from Member.css for consistency
+	- Includes responsive design for mobile and desktop
+*/
+
+/* Container and layout */
+.scan-form-container {
+	max-width: 300px;
+	margin: 0 auto;
+	padding: 10px;
+	background: var(--m-panel);
+	border-radius: var(--m-radius-lg);
+	box-shadow: var(--m-shadow-soft);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+
+}
+
+/* Center the form container vertically and horizontally */
+.member-bg .MemberContent {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	min-height: 100vh !important;
+	padding: var(--m-gap) !important;
+	width: 100% !important;
+}
+
+/* Override any conflicting styles from Member.css */
+.member-bg .MemberContent > * {
+	width: auto !important;
+	max-width: none !important;
+}
+
+/* Update background gradient */
+.member-bg {
+	background: linear-gradient(180deg, #2796c3 0%, #ffffff 100%) !important;
+}
+
+/* Header section */
+.scan-form-header {
+	text-align: center;
+	margin-bottom: var(--m-gap);
+	padding-bottom: var(--m-gap);
+	border-bottom: 1px solid rgba(107, 114, 128, 0.1);
+	gap: var(--m-gap);
+}
+
+.scan-form-header h1 {
+	margin: 0 0 0.5rem 0;
+	font-size: 1.45rem;
+	font-weight: 700;
+	color: var(--m-accent);
+	line-height: 1.2;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	text-align: center;
+}
+
+.scan-form-header p {
+	margin: 0;
+	color: var(--m-muted);
+	font-size: 1rem;
+	line-height: 1.5;
+}
+
+/* Event details card */
+.event-details-card {
+	background: linear-gradient(135deg, var(--m-bg-1) 0%, #eef7ff 100%);
+	border: 1px solid rgba(25, 118, 210, 0.1);
+	border-radius: var(--m-radius-sm);
+	padding: var(--m-gap);
+	margin-bottom: var(--m-gap);
+	box-shadow: var(--m-shadow-tight);
+}
+
+.event-details-card h3 {
+	margin: 0 0 0.75rem 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: var(--m-accent);
+}
+
+.event-details-card p {
+	margin: 0.25rem 0;
+	font-size: 0.875rem;
+	color: #374151;
+	line-height: 1.4;
+}
+
+.event-details-card p strong {
+	color: var(--m-accent);
+	font-weight: 600;
+}
+
+/* Form styles */
+.scan-form-form h3 {
+	margin: 0 0 1rem 0;
+	font-size: 1.25rem;
+	font-weight: 600;
+	color: var(--m-accent);
+	text-align: center;
+}
+
+.scan-form-group {
+	margin-bottom: 1.5rem;
+}
+
+.scan-form-group label {
+	display: block;
+	margin-bottom: 0.5rem;
+	font-weight: 600;
+	color: #374151;
+	font-size: 0.875rem;
+}
+
+.scan-form-group label::after {
+	content: ' *';
+	color: #ef4444;
+	font-weight: bold;
+}
+
+.scan-form-input,
+.scan-form-textarea {
+	width: 100%;
+	padding: 0.75rem;
+	border: 2px solid #e5e7eb;
+	border-radius: var(--m-radius-sm);
+	font-size: 1rem;
+	font-family: inherit;
+	transition: all 0.2s ease;
+	background: #ffffff;
+	color: #374151;
+	box-sizing: border-box;
+}
+
+.scan-form-input:focus,
+.scan-form-textarea:focus {
+	outline: none;
+	border-color: var(--m-accent);
+	box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+	background: #ffffff;
+}
+
+.scan-form-input::placeholder,
+.scan-form-textarea::placeholder {
+	color: #9ca3af;
+}
+
+.scan-form-textarea {
+	min-height: 100px;
+	resize: vertical;
+	line-height: 1.5;
+}
+
+/* Submit button */
+.scan-form-submit {
+	max-width: 300px;
+	padding: 0.875rem 1.5rem;
+	background: linear-gradient(135deg, var(--m-accent) 0%, var(--m-accent-2) 100%);
+	color: #ffffff;
+	border: none;
+	border-radius: var(--m-radius-sm);
+	font-size: 1rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	box-shadow: var(--m-shadow-tight);
+	
+}
+
+.submit-button-container {
+  display: flex;
+  justify-content: center;
+}
+
+.scan-form-submit:hover:not(:disabled) {
+	transform: translateY(-1px);
+	box-shadow: 0 6px 20px rgba(25, 118, 210, 0.3);
+	background: linear-gradient(135deg, var(--m-accent-2) 0%, var(--m-accent) 100%);
+}
+
+.scan-form-submit:active:not(:disabled) {
+	transform: translateY(0);
+}
+
+.scan-form-submit:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
+	transform: none;
+}
+
+/* Simple scan section */
+.scan-form-simple {
+	text-align: center;
+	padding: var(--m-gap);
+	background: linear-gradient(135deg, var(--m-bg-1) 0%, #eef7ff 100%);
+	border-radius: var(--m-radius-sm);
+	margin-bottom: var(--m-gap);
+}
+
+.scan-form-simple p {
+	margin: 0 0 1.5rem 0;
+	color: var(--m-muted);
+	font-size: 1rem;
+}
+
+/* Success and error messages */
+.success-message {
+	background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+	border: 1px solid #16a34a;
+	border-radius: var(--m-radius-sm);
+	padding: var(--m-gap);
+	margin: 1rem 0;
+	text-align: center;
+}
+
+.success-message h3 {
+	margin: 0 0 0.5rem 0;
+	color: #166534;
+	font-size: 1.125rem;
+	font-weight: 600;
+}
+
+.success-message p {
+	margin: 0.25rem 0;
+	color: #166534;
+	font-size: 0.875rem;
+}
+
+.error-message {
+	color: #dc2626;
+	font-weight: 500;
+	margin-bottom: 1rem;
+	text-align: center;
+	background: #fef2f2;
+	padding: 0.75rem;
+	border-radius: var(--m-radius-sm);
+	border: 1px solid #fecaca;
+}
+
+/* Generic buttons */
+.scan-btn,
+.go-home-btn {
+	padding: 0.75rem 1.5rem;
+	background: var(--m-accent);
+	color: #ffffff;
+	border: none;
+	border-radius: var(--m-radius-sm);
+	font-size: 1rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	box-shadow: var(--m-shadow-tight);
+	margin: 0.5rem;
+}
+
+.scan-btn:hover,
+.go-home-btn:hover {
+	background: var(--m-accent-2);
+	transform: translateY(-1px);
+	box-shadow: 0 4px 16px rgba(25, 118, 210, 0.3);
+}
+
+.scan-btn:active,
+.go-home-btn:active {
+	transform: translateY(0);
+}
+
+/* Loading and title styles */
+.member-title {
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: var(--m-accent);
+	margin-bottom: 0.5rem;
+	text-align: center;
+}
+
+.member-desc {
+	color: var(--m-muted);
+	font-size: 1rem;
+	text-align: center;
+	line-height: 1.5;
+	margin-bottom: 1rem;
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+	.scan-form-container {
+		margin: 0 var(--m-gap);
+		padding: calc(var(--m-gap) * 1.5);
+		max-width: 90%;
+	}
+
+	.scan-form-header h1 {
+		font-size: 1.5rem;
+	}
+
+	.event-details-card,
+	.scan-form-simple {
+		padding: calc(var(--m-gap) * 0.75);
+	}
+
+	.scan-form-input,
+	.scan-form-textarea {
+		padding: 0.625rem;
+		font-size: 0.875rem;
+	}
+
+	.scan-form-submit,
+	.scan-btn,
+	.go-home-btn {
+		padding: 0.75rem 1.25rem;
+		font-size: 0.875rem;
+	}
+}
+
+@media (max-width: 480px) {
+	.scan-form-container {
+		margin: 0 calc(var(--m-gap) * 0.5);
+		padding: calc(var(--m-gap) * 0.5);
+	}
+
+	.scan-form-header h1 {
+		font-size: 1.25rem;
+	}
+
+	.event-details-card h3,
+	.scan-form-form h3 {
+		font-size: 1rem;
+	}
+
+	.scan-form-group label {
+		font-size: 0.8125rem;
+	}
+}

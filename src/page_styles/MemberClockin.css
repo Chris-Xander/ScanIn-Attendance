@@ -1,0 +1,79 @@
+/* Styles specific to MemberClockin component */
+
+.clockin-container {
+  background: var(--m-panel);
+  border-radius: var(--m-radius-lg);
+  padding: 20px;
+  box-shadow: var(--m-shadow-soft);
+  background-color: rgb(255, 255, 255);
+  margin: auto;
+  margin-top: 50px;
+  max-height: 700px;
+  max-width: 7700px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.clockin-content {
+  padding: 10px;
+  display: inline;
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+}
+
+.member-title { font-size: 1.4rem; margin-bottom: 6px; color: var(--m-accent); font-weight: 700 }
+.member-desc { color: var(--m-muted); margin-bottom: 12px }
+
+.qr-code-icon { width:72px; height:72px; border-radius:10px; display:block; margin-bottom:12px }
+
+.qr-reader-box {
+  width: 260px;
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(180deg,#fff,#f3f9ff);
+  border: 1px solid rgba(25,118,210,0.06);
+  box-shadow: var(--m-shadow-tight);
+}
+
+.scan-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--m-radius-sm);
+  border: none;
+  background: linear-gradient(90deg, var(--m-accent), var(--m-accent-2));
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scan-result { padding: 10px 12px; border-radius: 8px; background: #f1fbf6; color: #047857 }
+
+@media (max-width: 980px) {
+  .qr-reader-box { width:220px; height:220px }
+}
+
+@media (max-width: 450px) {
+  .qr-reader-box { width:180px; height:180px }
+}
+
+/* Centering rules specific to clockin component to override global behavior */
+
+
+/* Make the scan button a comfortable centered size inside the clockin card */
+.clockin-container .scan-btn {
+  width: auto; /* don't stretch full width */
+  min-width: 220px;
+  padding: 10px 18px;
+  align-self: center;
+}
+
+/* Ensure the QR reader aligns center inside the clockin container */
+.clockin-container .qr-reader-box { margin: 0 auto }

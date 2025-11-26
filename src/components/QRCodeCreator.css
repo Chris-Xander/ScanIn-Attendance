@@ -1,0 +1,64 @@
+/* QRCodeCreator custom styles */
+.form-fields-group {
+  margin-top: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.styled-field-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.field-label-input {
+  flex: 2;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+.field-type-select {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+.required-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.95em;
+}
+.remove-field-btn {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: background 0.2s;
+}
+.remove-field-btn:hover {
+  background: #c0392b;
+}
+.styled-add-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+.add-field-btn {
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: background 0.2s;
+}
+.add-field-btn:hover {
+  background: #219150;
+}

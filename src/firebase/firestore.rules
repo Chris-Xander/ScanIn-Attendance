@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read and write their own user data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Allow admins to manage custom QR codes
+    match /customQRCodes/{qrCodeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if request.auth != null &&
+        resource.data.adminId == request.auth.uid;
+    }
+
+    // Allow attendance records to be created by anyone (for public QR scanning)
+    // and read by the admin who owns the QR code
+    match /attendanceRecords/{recordId} {
+      allow create: if true; // Allow public creation for QR scanning
+      allow read: if request.auth != null &&
+        resource.data.adminId == request.auth.uid;
+      allow update, delete: if request.auth != null &&
+        resource.data.adminId == request.auth.uid;
+    }
+
+    // Allow public access to scan forms (for QR code validation)
+    match /scanForms/{formId} {
+      allow read: if true; // Public read access for QR validation
+      allow write: if request.auth != null;
+    }
+
+    // Allow admins to manage attendance databases
+    match /attendanceDatabases/{dbId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Allow admins to manage QR-Gate reports
+    match /qrGateReports/{reportId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if request.auth != null &&
+        resource.data.adminId == request.auth.uid;
+    }
+
+    // Full form data (private)
+    match /formSubmitData/{documentId} {
+      allow create: if true; // anyone can submit
+      allow read: if request.auth != null && resource.data.adminId == request.auth.uid; // only admin
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+    }
+
+    // Duplicate check collection (public read)
+    match /formSubmitCheck/{documentId} {
+      allow create: if true; // anyone can add their device ID
+      allow read: if true; // anyone can check if their deviceId exists
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid; // admin control
+    }
+
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

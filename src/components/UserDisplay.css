@@ -1,0 +1,51 @@
+.user-display {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #e0e0e0;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.user-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.user-role {
+    font-size: 0.75rem;
+    color: #666;
+    text-transform: capitalize;
+}
+
+/* Compact version for headers */
+.user-display.compact .user-avatar {
+    width: 32px;
+    height: 32px;
+}
+
+.user-display.compact .user-name {
+    font-size: 0.85rem;
+}
+
+/* Large version for profile sections */
+.user-display.large .user-avatar {
+    width: 60px;
+    height: 60px;
+}
+
+.user-display.large .user-name {
+    font-size: 1.1rem;
+} 

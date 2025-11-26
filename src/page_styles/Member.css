@@ -1,0 +1,114 @@
+/*
+	Member page (page-level only)
+	- This file contains only page-level layout and variables used by the Member page itself (src/pages/Member.jsx)
+	- Component-specific rules have been moved to their dedicated files under src/page_styles/
+*/
+
+.member-bg {
+	--m-bg-1: #f7fbff;
+	--m-accent: #1976d2;
+	--m-accent-2: #0ea5e9;
+	--m-muted: #6b7280;
+	--m-panel: #ffffff;
+	--m-radius-lg: 12px;
+	--m-radius-sm: 8px;
+	--m-gap: 1rem;
+	--m-shadow-soft: 0 8px 32px rgba(16,24,40,0.06);
+	--m-shadow-tight: 0 4px 12px rgba(16,24,40,0.06);
+
+	box-sizing: border-box;
+	display: flex;
+	min-height: 100vh; /* fill viewport */
+	width: 100%;
+	align-items: stretch;
+	justify-content: center;
+	background: linear-gradient(180deg,var(--m-bg-1) 0%, #eef7ff 100%);
+	font-family: Inter, 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial;
+	color: #0f172a;
+}
+
+.member-container {
+	margin: auto;
+	padding: 10px;
+	background: var(--m-panel);
+	border-radius: var(--m-radius-lg);
+	box-shadow: var(--m-shadow-soft);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+
+}
+
+/* Make all descendants use border-box to avoid sizing surprises */
+.member-bg *,
+.member-bg *::before,
+.member-bg *::after { box-sizing: inherit; }
+
+/* Page main wrapper used by Member.jsx */
+.member-bg .Member-main {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	padding: 24px; /* inner padding */
+	min-height: 100vh;
+}
+
+.member-bg .Header-container {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 18px;
+}
+
+/* header title inside the member page */
+.member-bg .Header-container h1,
+.member-bg .Header-container h2 {
+	margin: 0;
+	font-size: 1.25rem;
+	font-weight: 700;
+	color: var(--m-accent);
+}
+
+.member-bg .MemberUser {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--m-muted);
+	font-weight: 600;
+}
+
+/* Content area where components render */
+.member-bg .MemberContent {
+	width: 100%;
+	flex: 1 1 auto;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+}
+
+/* Center content cards inside AdminContent */
+.member-bg .MemberContent > * {
+	width: 100%;
+	max-width: 960px; /* responsive cap */
+}
+
+/* Responsive adjustments (page-level) */
+@media (max-width: 980px) {
+	.member-bg .Member-main { padding: 18px }
+}
+
+@media (max-width: 780px) {
+	.member-bg { flex-direction: column }
+	.member-bg .Member-main { padding: 14px }
+	
+}
+
+@media (max-width: 450px) {
+	.member-bg .Member-main { padding: 10px }
+	
+}
+
+
+
