@@ -22,7 +22,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <AuthProvider>
-        <Router>
+        <Router basename="/ScanIn-Attendance">
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />

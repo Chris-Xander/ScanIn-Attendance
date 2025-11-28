@@ -12,6 +12,7 @@ const AdminQRCodes = () => {
 	const [loading, setLoading] = useState(false);
 	const [showQRModal, setShowQRModal] = useState(false);
 	const [selectedQR, setSelectedQR] = useState(null);
+	const PRODUCTION_BASE_URL = 'https://Chris-Xander.github.io/ScanIn-Attendance';
 	const [formData, setFormData] = useState({
 		name: '',
 		description: '',
@@ -365,10 +366,10 @@ const AdminQRCodes = () => {
 						</div>
 						<div className="qr-modal-body">
 							<div className="qr-code-display">
-								<QRCode value={`${window.location.origin}/scan-form/${selectedQR.qrId}`} size={200} />
+								<QRCode value={`${PRODUCTION_BASE_URL}/scan-form/${selectedQR.qrId}`} size={200} />
 							</div>
 							<div className="qr-details">
-								<p><strong>URL:</strong> <a href={`${window.location.origin}/scan-form/${selectedQR.qrId}`} target="_blank" rel="noopener noreferrer">{`${window.location.origin}/scan-form/${selectedQR.qrId}`}</a></p>
+								<p><strong>URL:</strong> <a href={`${PRODUCTION_BASE_URL}/scan-form/${selectedQR.qrId}`} target="_blank" rel="noopener noreferrer">{`${PRODUCTION_BASE_URL}/scan-form/${selectedQR.qrId}`}</a></p>
 								<p><strong>Description:</strong> {selectedQR.description}</p>
 								<p><strong>Location:</strong> {selectedQR.location}</p>
 								<p><strong>Event Type:</strong> {selectedQR.eventType}</p>
