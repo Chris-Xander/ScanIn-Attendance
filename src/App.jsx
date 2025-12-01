@@ -9,6 +9,8 @@ import Admin from './pages/Admin';
 import Signup from './pages/Signup';
 import PublicScan from './pages/PublicScan';
 import ScanForm from './pages/ScanForm';
+import SessionCheckin from './pages/SessionCheckin';
+import ParticipantScan from './components/ParticipantScan';
 
 const theme = createTheme({
   palette: {
@@ -29,6 +31,8 @@ function App() {
             <Route path="/signup" element={<Signup />} />
             <Route path="/scan" element={<PublicScan />} />
             <Route path="/scan-form/:qrId" element={<ScanForm />} />
+            <Route path="/participant-scan" element={<ParticipantScan/>}/>
+            <Route path="/session-checkin:sessionId" element={<SessionCheckin/>}/>
             <Route 
               path="/member" 
               element={

@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import './AdminReports.css';
 
 function AdminReports() {
+    const [sessions, setSessions] = useState([]);
     const { currentUser } = useAuth();
     const [qrGateReports, setQrGateReports] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -48,7 +49,8 @@ function AdminReports() {
 
     useEffect(() => {
         fetchQrGateReports();
-    }, []);
+        fetchSessions();
+    }, [currentUser]);
 
     const fetchQrGateReports = async () => {
         try {
@@ -66,6 +68,79 @@ function AdminReports() {
             console.error('Error fetching QR Gate reports:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+ 
+
+    const fetchSessions = async () => {
+        try {
+            if (!currentUser) return;
+            const sessionRef = collection(db, 'sessions');
+            const sessionQuery = query(sessionRef, where('adminId', '==', currentUser.uid));
+            const snapshot = await getDocs(sessionQuery);
+            
+            const sessionsData = await Promise.all(
+                snapshot.docs.map(async (doc) => {
+                    const sessionData = doc.data();
+                    
+                    // Get attendance count for this session
+                    const attendanceRef = collection(db, 'attendanceRecords');
+                    const attendanceQuery = query(attendanceRef, where('sessionId', '==', doc.id));
+                    const attendanceSnapshot = await getDocs(attendanceQuery);
+                    
+                    // Get unique members
+                    const uniqueMembers = new Set();
+                    attendanceSnapshot.docs.forEach(attDoc => {
+                        uniqueMembers.add(attDoc.data().memberId);
+                    });
+                    
+                    return {
+                        id: doc.id,
+                        ...sessionData,
+                        attendanceCount: attendanceSnapshot.size,
+                        uniqueMembersCount: uniqueMembers.size
+                    };
+                })
+            );
+            
+            setSessions(sessionsData);
+        } catch (error) {
+            console.error('Error fetching sessions', error);
+        }
+    };
+
+    const exportSessionAttendance = async (sessionId, sessionName) => {
+        try {
+            const attendanceRef = collection(db, 'attendanceRecords');
+            const q = query(attendanceRef, where('sessionId', '==', sessionId));
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) {
+                alert('No attendance records found for this session');
+                return;
+            }
+
+            const attendanceData = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    memberName: data.memberName || 'Unknown',
+                    memberId: data.memberId || 'N/A',
+                    deviceToken: data.deviceToken || 'N/A',
+                    checkInTime: data.checkInTime ? new Date(data.checkInTime).toLocaleString() : 'N/A',
+                    status: data.status || 'present',
+                    location: data.location ? `${data.location.latitude}, ${data.location.longitude}` : 'N/A'
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(attendanceData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+
+            XLSX.writeFile(workbook, `${sessionName}_Attendance.xlsx`);
+        } catch (error) {
+            console.error('Error exporting attendance session:', error);
+            alert('Failed to export attendance data');
         }
     };
 
@@ -228,6 +303,46 @@ function AdminReports() {
                     </tbody>
                 </table>
             </div>
+            {/* Session Reports Section */}
+            <div className="session-reports-section">
+                <h3>Session Attendance Reports</h3>
+                <p>Export attendance data for your pre-registered sessions.</p>
+
+                {sessions.length === 0 ? (
+                    <div className="empty-state">
+                        <p>No sessions found. Create a session first to see reports here.</p>
+                    </div>
+                ) : (
+                    <div className="session-reports-list">
+                        {sessions.map(session => (
+                            <div key={session.id} className="session-report-item">
+                                <div className="session-info">
+                                    <h4>{session.name}</h4>
+                                    <p><strong>Description:</strong> {session.description || 'No description'}</p>
+                                    <p><strong>Location:</strong> {session.location || 'Not specified'}</p>
+                                    <p><strong>Date Range:</strong> {new Date(session.startDate).toLocaleDateString()} - {new Date(session.endDate).toLocaleDateString()}</p>
+                                    <p><strong>Total Check-ins:</strong> {session.attendanceCount || 0}</p>
+                                    <p><strong>Unique Members:</strong> {session.uniqueMembersCount || 0}</p>
+                                    <p><strong>Status:</strong> {session.isActive ? 'Active' : 'Inactive'}</p>
+                                    <p><strong>Created:</strong> {new Date(session.createdAt?.toDate?.() || session.createdAt).toLocaleDateString()}</p>
+                                    {session.geofence?.latitude && session.geofence?.longitude && (
+                                        <p><strong>Geofence:</strong> Enabled ({session.geofence.radius}m radius)</p>
+                                    )}
+                                </div>
+                                <div className="session-actions">
+                                    <button
+                                        className="export-session-btn"
+                                        onClick={() => exportSessionAttendance(session.id, session.name)}
+                                    >
+                                        Export Attendance
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
         </div>
     );
 }

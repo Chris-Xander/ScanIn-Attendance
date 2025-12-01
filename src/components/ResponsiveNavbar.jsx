@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 const ResponsiveNavbar = ({ activeSection, onNavClick, logoText = 'Admin Panel', navItems = [], userDisplay = 'User', logoutLink }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
     const navigate = useNavigate();
 
     const handleNavClick = (section) => {
@@ -23,11 +24,19 @@ const ResponsiveNavbar = ({ activeSection, onNavClick, logoText = 'Admin Panel',
         setIsMobileMenuOpen(false);
     };
 
-    const handleLogOut = async ( ) => {
+    const openLogoutModal = () => {
+        setShowLogoutModal(true);
+    };
+
+    const closeLogoutModal = () => {
+        setShowLogoutModal(false);
+    };
+
+    const confirmLogout = async () => {
         await signOut(auth);
         localStorage.clear();
         navigate('/');
-    } 
+    };
 
     // Close mobile menu when clicking outside
     useEffect(() => {
@@ -69,7 +78,7 @@ const ResponsiveNavbar = ({ activeSection, onNavClick, logoText = 'Admin Panel',
 
                 <div className="login-section desktop-login">
                     <span className="user-email">{userDisplay}</span>
-                    <button className='logout-button' onClick={handleLogOut}>Logout</button>
+                    <button className='logout-button' onClick={openLogoutModal}>Logout</button>
                 </div>
 
                 {/* Mobile Menu Button */}
@@ -117,7 +126,11 @@ const ResponsiveNavbar = ({ activeSection, onNavClick, logoText = 'Admin Panel',
                     ))}
                     {logoutLink && (
                         <li className="mobile-nav-item">
-                            <a href={logoutLink} className="mobile-nav-link logout-link">
+                            <a
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); openLogoutModal(); }}
+                                className="mobile-nav-link logout-link"
+                            >
                                 <span className="nav-icon">🚪</span>
                                 <span className="nav-text">Logout</span>
                             </a>
@@ -125,6 +138,40 @@ const ResponsiveNavbar = ({ activeSection, onNavClick, logoText = 'Admin Panel',
                     )}
                 </ul>
             </div>
+
+            {/* Logout Confirmation Modal */}
+            {showLogoutModal && (
+                <div className="qr-modal-overlay" onClick={closeLogoutModal}>
+                    <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="qr-modal-header">
+                            <h2>Confirm Logout</h2>
+                            <button className="qr-modal-close" onClick={closeLogoutModal}>×</button>
+                        </div>
+                        <div className="qr-modal-body">
+                            <div className="delete-confirmation">
+                                <p><strong>Are you sure you want to logout?</strong></p>
+                                <div className="delete-warning">
+                                    <p>You will be redirected to the login page and will need to sign in again to access your account.</p>
+                                </div>
+                                <div className="admin-db-btns" style={{marginTop: '20px'}}>
+                                    <button
+                                        onClick={closeLogoutModal}
+                                        className="admin-db-open-btn"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={confirmLogout}
+                                        className="admin-db-delete-btn"
+                                    >
+                                        Logout
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </header>
     );
 };

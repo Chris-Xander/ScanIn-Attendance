@@ -1,4 +1,4 @@
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import qrCodeIcon from '../assets/Icons/qr-code.png';
@@ -18,11 +18,7 @@ const MemberClockin = ({ currentUser }) => {
 
     useEffect(() => {
         if (!scanning) return;
-        const scanner = new Html5QrcodeScanner('reader', {
-            qrbox: {
-                width: 250,
-                height: 250,
-            },
+        const scanner = new Html5Qrcode('reader', {
             fps: 7
         });
         scannerRef.current = scanner;

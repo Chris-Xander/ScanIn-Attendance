@@ -8,7 +8,7 @@ service cloud.firestore {
 
     // Allow admins to manage custom QR codes
     match /customQRCodes/{qrCodeId} {
-      allow read: if request.auth != null;
+      allow read: if true; // Allow public read for QR validation
       allow create: if request.auth != null &&
         request.resource.data.adminId == request.auth.uid;
       allow update, delete: if request.auth != null &&
@@ -48,7 +48,10 @@ service cloud.firestore {
     // Full form data (private)
     match /formSubmitData/{documentId} {
       allow create: if true; // anyone can submit
-      allow read: if request.auth != null && resource.data.adminId == request.auth.uid; // only admin
+      allow read: if request.auth != null && (
+        resource.data.adminId == request.auth.uid
+        || request.auth.token.admin == true // allow admin users with custom claim 'admin'
+      ); // only admin or owner
       allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
     }
 
@@ -57,6 +60,68 @@ service cloud.firestore {
       allow create: if true; // anyone can add their device ID
       allow read: if true; // anyone can check if their deviceId exists
       allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid; // admin control
+    }
+
+    // Session management - only admins can create/manage sessions
+    match /sessions/{sessionId} {
+      // Allow public reads so check-in pages can fetch session info without auth
+      allow read: if true;
+      // Only admins (owner) may create/update/delete sessions
+      allow create: if request.auth != null && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+    }
+
+    // Participants - admins can manage participants for their sessions
+    match /participants/{participantId} {
+      allow read: if request.auth != null && resource.data.adminId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+    }
+
+    // Members collection - public read, admin write
+    match /members/{memberId} {
+      // Public reads so client-side check-in can lookup members by uniqueIdentifier
+      allow read: if true;
+      // Only the admin who owns the member record (or users with admin claim) can create/update/delete
+      allow create: if request.auth != null && (
+        request.resource.data.adminId == request.auth.uid
+        || request.auth.token.admin == true
+      );
+      allow update, delete: if request.auth != null && (
+        resource.data.adminId == request.auth.uid
+        || request.auth.token.admin == true
+      );
+    }
+
+    // Devices collection - allow clients to create/lookup device tokens
+    match /devices/{deviceId} {
+      // Allow create and read so devices can register themselves and clients can validate tokens
+      allow create: if true;
+      allow read: if true;
+      // Only owner admin may update/delete device documents
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+    }
+
+    // Attendance records for the new device-token system
+    match /attendanceRecords/{recordId} {
+      // Allow public creation from the check-in flow (server or client)
+      allow create: if true;
+      // Admin can read attendance for reporting
+      allow read: if request.auth != null && (
+        resource.data.adminId == request.auth.uid
+        || request.auth.token.admin == true
+      );
+      allow update, delete: if request.auth != null && (
+        resource.data.adminId == request.auth.uid
+        || request.auth.token.admin == true
+      );
+    }
+
+    // Attendance logs - participants can create their own check-ins, admins can read
+    match /attendanceLogs/{logId} {
+      allow create: if request.auth != null; // authenticated users can log attendance
+      allow read: if request.auth != null && resource.data.adminId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
     }
 
     // Default deny all other access
