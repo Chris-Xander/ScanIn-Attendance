@@ -3,12 +3,12 @@ import './AdminDashboard.css';
 
 function AdminDashboard() {
     return (
-        <div className='dashboard-container'>
+        <div className='dashboard-display-container'>
             <h2>Admin Dashboard</h2>
             <p>Welcome to the admin panel. </p>
 
             {/* Dashboard Stats */}
-            <div className="dashboard-stats">
+            <div className="dashboard-content">
                 <div className="dashboard-stat">
                     <h3>Active QR Codes</h3>
                     <p>0</p>

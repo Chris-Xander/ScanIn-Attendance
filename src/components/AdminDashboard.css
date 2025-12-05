@@ -1,31 +1,37 @@
 /* Admin Dashboard Styles */
-.dashboard-container {
+.dashboard-content {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 10px;
   margin: auto;
-  align-items: center;
+  gap: 1.8rem;
+
 }
 
 .dashboard-container h2 {
   color: #ffffff;
 }
 
-.dashboard-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin: auto;
-  width: auto;
+.dashboard-stats-container {
+  display: flex;
+  flex-direction: row;
+
 }
 
 .dashboard-stat {
-  background: white;
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   border: 1px solid #e3e8ee;
   transition: all 0.3s ease;
   text-align: center;
-  max-height: 450px;
-  max-width:250px;
+  max-height: 350px;
+  height: 100%;
+  max-width:300px;
+  width: 100%;
+  margin: auto;
 }
 
 .dashboard-stat:hover {
@@ -51,11 +57,6 @@
 
 /* Mobile Responsive for Dashboard */
 @media (max-width: 415px) {
-  .dashboard-stats {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    margin: 1rem 0;
-  }
 
   .dashboard-stat {
     padding: 1rem;

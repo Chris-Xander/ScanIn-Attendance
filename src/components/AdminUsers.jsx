@@ -323,7 +323,7 @@ function AdminUsers() {
 
             {/* CSV Upload Form */}
             <div className="admin-db-form-container">
-                <div className="admin-db-form">
+                <div className="admin-db-form-csv">
                     <h3>Register Members via CSV</h3>
                     <p>Upload a CSV file with columns: Name, Email/Phone (required)</p>
                     <input
@@ -383,8 +383,8 @@ function AdminUsers() {
             <p>Create and manage attendance sessions with pre-registered participants.</p>
 
             {/* Create Session Form */}
-            <div className="admin-db-form-container">
-                <div className="admin-db-form">
+            <div className="admin-db-form-container-session">
+                <div className="admin-db-session-form">
                     <h3>Create New Session</h3>
                     <form onSubmit={handleSessionSubmit}>
                         <label htmlFor="sessionName">Session Name:</label>
@@ -412,7 +412,7 @@ function AdminUsers() {
                             onChange={(e) => setSessionForm({...sessionForm, location: e.target.value})}
                         />
 
-                        <div style={{display: 'flex', gap: '10px'}}>
+                        <div style={{display: 'grid', gap: '10px'}}>
                             <div style={{flex: 1}}>
                                 <label htmlFor="startDate">Start Date & Time:</label>
                                 <input
@@ -445,7 +445,7 @@ function AdminUsers() {
 
                         <label style={{marginTop: '1.5rem', fontWeight: 'bold', color: '#f44336'}}>Geofence Settings (Optional)</label>
                         
-                        <div style={{display: 'flex', gap: '10px'}}>
+                        <div style={{display: 'grid', gap: '10px'}}>
                             <div style={{flex: 1}}>
                                 <label htmlFor="geofenceLat">Latitude:</label>
                                 <input
@@ -492,6 +492,9 @@ function AdminUsers() {
                         <div className="admin-db-btns">
                             <button type="submit" className="admin-db-open-btn" disabled={loading}>
                                 {loading ? 'Creating...' : 'Create Session'}
+                            </button>
+                            <button type="clear" className="admin-db-open-btn" disabled={loading} style={{backgroundColor: 'red'}}>
+                                {loading ? 'Clearing...' : 'Clear'}
                             </button>
                         </div>
                     </form>

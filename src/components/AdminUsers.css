@@ -5,11 +5,12 @@
 /* TAB NAVIGATION */
 .tab-navigation {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 2rem;
   border-bottom: 2px solid #e3e8ee;
   padding-bottom: 0;
-  flex-wrap: wrap;
+  margin: auto;
 }
 
 .tab-navigation button {
@@ -17,14 +18,15 @@
   background: none;
   border: none;
   border-bottom: 3px solid transparent;
-  color: #666;
-  font-size: 1rem;
+  color: #ffffff;
+  font-size: 1.2rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   position: relative;
+  margin: auto;
 }
 
 .tab-navigation button:hover {
@@ -34,7 +36,7 @@
 }
 
 .tab-navigation button.active {
-  color: #1976d2;
+  color: #022447;
   border-bottom-color: #2196f3;
   background: rgba(33, 150, 243, 0.08);
 }
@@ -56,7 +58,7 @@
 }
 
 .tab-content h2 {
-  color: #1976d2;
+  color: #fcfcfc;
   font-size: 2rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
@@ -142,12 +144,40 @@
   width: 100%;
 }
 
-.admin-db-form {
+.admin-db-session-form {
+  background-color: rgb(238, 237, 237);
+  padding: 10px;
+  max-height: 650px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  justify-content: center;
+  margin: auto;
+  border-radius: 15px;
+}
+
+.admin-db-session-form form{
+  background-color: white;
+  padding: 10px;
+  max-width: 575px;
+  display: flex;
+  flex-direction: column;
+  font-size: medium;
+  gap: 0.2rem;
+  font-weight: 600;
+  border-radius: 15px;
+  margin: auto;
+  
+}
+
+.admin-db-form-csv {
   background: #fff;
   padding: 2rem;
   border-radius: 14px;
-  max-width: 650px;
+  max-width: 550px;
   width: 100%;
+  height: 250px;
   box-shadow: 0 2px 12px rgba(33, 150, 243, 0.08);
   border: 1.5px solid #e3e8ee;
   transition: all 0.3s ease;
@@ -225,31 +255,13 @@
 
 /* BUTTON STYLES */
 .admin-db-btns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 1rem;
-  margin-top: 1.5rem;
+  margin: auto;
 }
 
-.admin-db-open-btn,
-.admin-db-form button[type="submit"] {
-  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
-  color: #fff;
-  padding: 0.8rem 1.5rem;
-  border-radius: 8px;
-  border: none;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
+.admin-db-open-btn {
+  
 }
 
 .admin-db-open-btn:hover:not(:disabled),
@@ -270,25 +282,8 @@
   cursor: not-allowed;
 }
 
-.admin-db-delete-btn,
-.admin-db-form button.admin-db-delete-btn {
-  background: linear-gradient(135deg, #ff7a63 0%, #ff6b4a 100%);
-  color: #fff;
-  padding: 0.8rem 1.5rem;
-  border-radius: 8px;
-  border: none;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
+.admin-db-delete-btn {
+
 }
 
 .admin-db-delete-btn:hover:not(:disabled) {
@@ -758,9 +753,27 @@
     font-size: 1.8rem;
   }
 
-  .admin-db-form {
-    padding: 1rem;
-  }
+  .admin-db-form-csv {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 14px;
+  max-width: 550px;
+  width: 80%;
+  max-height: 400px;
+  height: 100%;
+  box-shadow: 0 2px 12px rgba(33, 150, 243, 0.08);
+  border: 1.5px solid #e3e8ee;
+  transition: all 0.3s ease;
+}
+
+.admin-db-form-csv input {
+  text-wrap: wrap;
+}
+
+  .admin-db-session-form form{
+  max-width: 275px; 
+ 
+}
 
   .admin-db-form label {
     font-size: 0.85rem;
