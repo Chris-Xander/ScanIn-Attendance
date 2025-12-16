@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/config';
-import { doc, addDoc, collection, updateDoc, getDocs, getDoc, setDoc } from 'firebase/firestore';
+import { doc, addDoc, collection, updateDoc, getDocs, getDoc, setDoc, query, where } from 'firebase/firestore';
 import { getDeviceId } from '../utility/deviceFingerprint.jsx';
 import '../page_styles/ScanForm.css';
+
 
 function ScanForm() {
 	const { qrId } = useParams();
@@ -27,8 +28,10 @@ function ScanForm() {
 
 			try {
 				const qrCodesRef = collection(db, 'customQRCodes');
-				const qrCodesSnapshot = await getDocs(qrCodesRef);
-				const qrCode = qrCodesSnapshot.docs.find(doc => doc.data().qrId === qrId);
+				// Query for active QR codes with matching qrId
+				const q = query(qrCodesRef, where('qrId', '==', qrId), where('isActive', '==', true));
+				const qrCodesSnapshot = await getDocs(q);
+				const qrCode = qrCodesSnapshot.docs[0]; // Should only be one match
 
 				if (!qrCode) {
 					setError('QR code not found');
@@ -121,7 +124,7 @@ function ScanForm() {
 				setSubmitting(false);
 				return;
 			}
-
+ 
 			const attendanceData = {
 				qrCodeId: qrId,
 				qrCodeName: qrCodeData.name,
@@ -136,7 +139,7 @@ function ScanForm() {
 
 			console.log('Submitting attendance record...');
 			const attendanceDocRef = await addDoc(collection(db, 'attendanceRecords'), attendanceData);
-			console.log('Attendance record submitted successfully:', attendanceDocRef.id);
+			console.log('Attendance record submitted successfully:', attendanceDocRef.id); 
 
             if (qrCodeData.requiresForm) {
 				console.log('Submitting form data...');

@@ -241,68 +241,9 @@ function AdminReports() {
                         </div>
                     ))}
                 </div>
-            )}
+            )};
 
-            {/* Report Filters - Keep existing functionality */}
-            <div className="admin-db-form-container">
-                <div className="admin-db-form">
-                    <h3>Generate Report</h3>
-                    <div className="db-date-fields">
-                        <div className="db-date-field">
-                            <label htmlFor="startDate">Start Date:</label>
-                            <input
-                                type="date"
-                                id="startDate"
-                            />
-                        </div>
-                        <div className="db-date-field">
-                            <label htmlFor="endDate">End Date:</label>
-                            <input
-                                type="date"
-                                id="endDate"
-                            />
-                        </div>
-                    </div>
 
-                    <label htmlFor="reportType">Report Type:</label>
-                    <select id="reportType">
-                        <option value="attendance">Attendance Report</option>
-                        <option value="user-activity">User Activity</option>
-                        <option value="qr-usage">QR Code Usage</option>
-                    </select>
-
-                    <div className="admin-db-btns">
-                        <button className="admin-db-open-btn">
-                            Generate Report
-                        </button>
-                        <button className="admin-db-delete-btn">
-                            Export Data
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Sample Report Table */}
-            <div className="db-section-spacing">
-                <h3>Recent Activity</h3>
-                <table className="attendance-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>User</th>
-                            <th>Action</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colSpan="4" style={{textAlign: 'center', color: '#666'}}>
-                                No data available
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
             {/* Session Reports Section */}
             <div className="session-reports-section">
                 <h3>Session Attendance Reports</h3>
@@ -332,9 +273,8 @@ function AdminReports() {
                                 <div className="session-actions">
                                     <button
                                         className="export-session-btn"
-                                        onClick={() => exportSessionAttendance(session.id, session.name)}
-                                    >
-                                        Export Attendance
+                                        onClick={() => exportSessionAttendance(session.id, session.name)} disabled={loading}>
+                                        {loading ? 'Exporting...' : 'Export Data'}
                                     </button>
                                 </div>
                             </div>

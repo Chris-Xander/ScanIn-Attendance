@@ -78,7 +78,8 @@
   .admin-qr-main {
     padding: 0.5rem 0.1rem 0.5rem 0.1rem;
     border-radius: 6px;
-    max-width: 250px;
+    max-width: 240px;
+
   }
   .admin-qr-title {
     font-size: 0.95rem;
@@ -90,6 +91,10 @@
     font-size: 0.9rem;
     padding: 0.5rem 0;
   }
+
+  .create-qr-form {
+    max-width: 230px;
+  }
 }
 
 @media (max-width: 326px) {
@@ -98,6 +103,7 @@
     max-width: 199px;
   }
 }
+
 
 
 /* AdminQRCodes custom styles */
@@ -212,7 +218,9 @@
 
 .form-row {
   display: flex;
+  flex-direction: column;
   gap: 1rem;
+
 }
 
 .form-row .form-group {

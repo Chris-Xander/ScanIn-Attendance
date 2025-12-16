@@ -349,6 +349,9 @@
   .mobile-nav-link {
     font-size: 1.1rem;
     padding: 1rem 1.5rem;
+    max-width: 300px;
+    align-items: center;
+    margin: auto;
   }
 
   .mobile-menu-logo h2 {

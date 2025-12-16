@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/config';
-import { collection, addDoc, getDocs, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs as getAllDocs } from 'firebase/firestore';
+import { writeBatch, collection, addDoc, getDocs, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs as getAllDocs } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import QRCode from 'react-qr-code';
 import './AdminUsers.css';
@@ -12,7 +12,10 @@ function AdminUsers() {
     const [members, setMembers] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [attendanceLogs, setAttendanceLogs] = useState([]);
+    const [sessionAttendance, setSessionAttendance] = useState({});
     const [loading, setLoading] = useState(false);
+    const batch = writeBatch(db);
+
 
     // Session form state
     const [sessionForm, setSessionForm] = useState({
@@ -21,6 +24,7 @@ function AdminUsers() {
         location: '',
         startDate: '',
         endDate: '',
+        maxParticipants: '',
         geofence: {
             latitude: '',
             longitude: '',
@@ -85,6 +89,28 @@ function AdminUsers() {
             return unsubscribe;
         } catch (error) {
             console.error('Error fetching attendance logs:', error);
+        }
+    };
+
+    const fetchSessionAttendance = async () => {
+        try {
+            const logsRef = collection(db, 'attendanceLogs');
+            const q = query(logsRef, where('adminId', '==', currentUser.uid));
+            const snapshot = await getDocs(q);
+            const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // Group logs by sessionId
+            const grouped = logsData.reduce((acc, log) => {
+                if (!acc[log.sessionId]) {
+                    acc[log.sessionId] = [];
+                }
+                acc[log.sessionId].push(log);
+                return acc;
+            }, {});
+
+            setSessionAttendance(grouped);
+        } catch (error) {
+            console.error('Error fetching session attendance:', error);
         }
     };
 
@@ -227,7 +253,7 @@ function AdminUsers() {
     const exportSessionAttendance = async (sessionId, sessionName) => {
         try {
             const logsRef = collection(db, 'attendanceLogs');
-            const q = query(logsRef, where('sessionId', '==', sessionId));
+            const q = query(logsRef, where('sessionId', '==', sessionId), where('adminId', '==', currentUser.uid));
             const snapshot = await getDocs(q);
 
             const attendanceData = snapshot.docs.map(doc => ({
@@ -279,23 +305,112 @@ function AdminUsers() {
 
         setLoading(true);
         try {
-            // Delete all attendance logs for this session first
-            const attendanceQuery = query(
+            console.log('--- DEBUG: Deleting Session ---');
+            console.log('Current User ID:', currentUser?.uid);
+            console.log('Session ID:', sessionToDelete?.id, 'typeof:', typeof sessionToDelete?.id);
+            console.log('Session adminId:', sessionToDelete?.adminId);
+
+
+            // Verify the session belongs to current user
+            if (sessionToDelete.adminId !== currentUser.uid) {
+                console.error('Session does not belong to current user');
+                alert('You do not have permission to delete this session');
+                return;
+            }
+
+            // First, check what attendance logs exist for this session
+            console.log('Checking attendance logs...');
+            const allAttendanceQuery = query(
                 collection(db, 'attendanceLogs'),
                 where('sessionId', '==', sessionToDelete.id)
             );
-            const attendanceSnapshot = await getDocs(attendanceQuery);
-            const deleteAttendancePromises = attendanceSnapshot.docs.map(doc => deleteDoc(doc.ref));
-            await Promise.all(deleteAttendancePromises);
+            const allAttendanceSnapshot = await getDocs(allAttendanceQuery);
+            console.log('Total attendance logs found:', allAttendanceSnapshot.docs.length);
+
+            // Log details of each attendance log
+            allAttendanceSnapshot.docs.forEach((doc, index) => {
+                const data = doc.data();
+                console.log(`Attendance log ${index + 1}:`, {
+                    id: doc.id,
+                    adminId: data.adminId,
+                    sessionId: data.sessionId,
+                    participantName: data.participantName
+                });
+            });
+
+            // Delete attendance logs for this session that we have permission to delete
+            // This includes logs owned by current user OR logs without adminId (legacy)
+            // Use writeBatch for efficient batch deletion (max 500 operations per batch)
+            const logsToDelete = [];
+
+            for (const doc of allAttendanceSnapshot.docs) {
+                const data = doc.data();
+                const canDelete = (
+                    data.adminId === currentUser.uid || // Owned by current user
+                    !data.adminId // Legacy log without adminId
+                );
+
+                if (canDelete) {
+                    console.log('Will delete attendance log:', doc.id, {
+                        adminId: data.adminId,
+                        hasAdminId: !!data.adminId
+                    });
+                    logsToDelete.push(doc.ref);
+                } else {
+                    console.log('Skipping attendance log (not owned):', doc.id, {
+                        adminId: data.adminId
+                    });
+                }
+            }
+
+            console.log('Total attendance logs to delete:', logsToDelete.length);
+
+            if (logsToDelete.length > 0) {
+                console.log('Deleting attendance logs in batches...');
+
+                // Process deletions in batches of 500 (Firebase limit)
+                const batchSize = 500;
+                const batches = [];
+                for (let i = 0; i < logsToDelete.length; i += batchSize) {
+                    batches.push(logsToDelete.slice(i, i + batchSize));
+                }
+
+                console.log(`Processing ${batches.length} batch(es) of deletions`);
+
+                for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+                    const currentBatch = batches[batchIndex];
+                    const batch = writeBatch(db);
+
+                    console.log(`Processing batch ${batchIndex + 1}/${batches.length} with ${currentBatch.length} deletions`);
+
+                    currentBatch.forEach(docRef => {
+                        batch.delete(docRef);
+                    });
+
+                    await batch.commit();
+                    console.log(`Successfully committed batch ${batchIndex + 1}/${batches.length}`);
+                }
+
+                console.log('Successfully deleted all attendance logs');
+            } else {
+                console.log('No attendance logs to delete');
+            }
 
             // Delete the session
+            console.log('Deleting session...');
             await deleteDoc(doc(db, 'sessions', sessionToDelete.id));
+            console.log('Successfully deleted session');
 
             fetchSessions();
             alert('Session and all associated attendance data deleted successfully!');
         } catch (error) {
             console.error('Error deleting session:', error);
-            alert('Failed to delete session');
+            console.error('Error details:', {
+                code: error.code,
+                message: error.message,
+                stack: error.stack
+            });
+            alert(`Failed to delete session: ${error.message}`);
         } finally {
             setLoading(false);
             closeDeleteModal();
@@ -356,22 +471,48 @@ function AdminUsers() {
                 </div>
             </div>
 
-            {/* Existing Members */}
+            {/* Registered Members by Session */}
             <div className="members-list">
-                <h3>Registered Members</h3>
-                {members.length === 0 ? (
-                    <p>No members registered yet.</p>
+                <h3>Registered Members for Sessions</h3>
+                {sessions.length === 0 ? (
+                    <p>No sessions created yet.</p>
                 ) : (
-                    members.map(member => (
-                        <div key={member.id} className="member-item">
-                            <div className="member-info">
-                                <h4>{member.name}</h4>
-                                <p><strong>Email/Phone:</strong> {member.email}</p>
-                                {member.contact && <p><strong>Contact:</strong> {member.contact}</p>}
-                                <p><strong>Registered:</strong> {member.createdAt?.toDate()?.toLocaleDateString()}</p>
+                    sessions.map(session => {
+                        const sessionLogs = sessionAttendance[session.id] || [];
+                        return (
+                            <div key={session.id} className="db-section-spacing">
+                                <h4>{session.name} - Registered Members</h4>
+                                <table className="attendance-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>User</th>
+                                            <th>Action</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sessionLogs.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="4" style={{textAlign: 'center', color: '#666'}}>
+                                                    No data available
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            sessionLogs.map(log => (
+                                                <tr key={log.id}>
+                                                    <td>{log.checkInTime?.toDate()?.toLocaleDateString()}</td>
+                                                    <td>{log.participantName}</td>
+                                                    <td>Check-in</td>
+                                                    <td>Present</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </>
@@ -509,7 +650,7 @@ function AdminUsers() {
                 ) : (
                     sessions.map(session => (
                         <div key={session.id} className="session-item">
-                            <div className="session-info">
+                            <div className="session-info-box">
                                 <h4>{session.name}</h4>
                                 <p>{session.description}</p>
                                 <p><strong>Location:</strong> {session.location}</p>
@@ -517,7 +658,13 @@ function AdminUsers() {
                                 <p><strong>End:</strong> {session.endDate ? new Date(session.endDate).toLocaleString() : 'Not set'}</p>
                                 <p><strong>Status:</strong> {session.isActive ? 'Active' : 'Inactive'}</p>
                             </div>
-                            <div className="session-actions">
+                            <div className="session-actions-box">
+                                <button
+                                    onClick={() => openDeleteModal(session)}
+                                    className="admin-db-delete-btn"
+                                >
+                                    Delete Session
+                                </button>
                                 <button
                                     onClick={() => viewSessionQRCode(session)}
                                     className="admin-db-open-btn"
@@ -529,12 +676,6 @@ function AdminUsers() {
                                     className="admin-db-open-btn"
                                 >
                                     Export Attendance
-                                </button>
-                                <button
-                                    onClick={() => openDeleteModal(session)}
-                                    className="admin-db-delete-btn"
-                                >
-                                    Delete Session
                                 </button>
                             </div>
                         </div>

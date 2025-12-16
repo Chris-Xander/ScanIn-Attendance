@@ -30,15 +30,16 @@
 }
 
 .tab-navigation button:hover {
-  color: #1976d2;
+  color: #6cb5fe;
   background: rgba(33, 150, 243, 0.05);
   border-bottom-color: #2196f3;
 }
 
 .tab-navigation button.active {
   color: #022447;
-  border-bottom-color: #2196f3;
+  border-bottom-color: #328fdc;
   background: rgba(33, 150, 243, 0.08);
+  background-color: #82c2fb;
 }
 
 /* TAB CONTENT */
@@ -66,10 +67,16 @@
 }
 
 .tab-content > p {
-  color: #666;
+  color: #000000;
+  font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+  font-weight: 100;
   font-size: 1.05rem;
-  margin-bottom: 2rem;
+  padding: 1.8rem 1rem;
+  margin: auto;
   line-height: 1.6;
+  background-color: #c0eafe;
+  border-radius: 10px;
+  border-bottom: #000000;
 }
 
 /* USER STATS CARDS */
@@ -153,7 +160,7 @@
   flex-direction: column;
   gap: 0.3rem;
   justify-content: center;
-  margin: auto;
+  margin-top: 10px;
   border-radius: 15px;
 }
 
@@ -260,8 +267,15 @@
   margin: auto;
 }
 
-.admin-db-open-btn {
-  
+.admin-db-open-btn,
+.admin-db-delete-btn {
+   padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.2s ease;
 }
 
 .admin-db-open-btn:hover:not(:disabled),
@@ -312,7 +326,7 @@
 .members-list h3,
 .sessions-list h3,
 .attendance-logs h3 {
-  color: #1976d2;
+  color: #ffffff;
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0 0 1.5rem 0;
@@ -320,6 +334,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  border-bottom: 4px solid white;
 }
 
 .members-list > p,
@@ -353,32 +368,41 @@
   border-color: #2196f3;
 }
 
-.member-info,
-.session-info {
+.member-info {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
 .member-info h4,
-.session-info h4 {
+.session-info-box h4 {
   color: #1976d2;
-  font-size: 1.3rem;
+  font-size: 1.02rem;
   font-weight: 700;
   margin: 0 0 0.5rem 0;
   letter-spacing: 0.5px;
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .member-info p,
-.session-info p {
+.session-info-box p {
   color: #555;
   font-size: 0.95rem;
   margin: 0;
   line-height: 1.5;
 }
 
+.session-info-box {
+  color: #555;
+  font-size: 1.95rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
 .member-info strong,
-.session-info strong {
+.session-info-box strong {
   color: #1976d2;
   font-weight: 600;
 }
@@ -386,22 +410,37 @@
 /* SESSION ITEM ACTIONS */
 .session-item {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   gap: 2rem;
   flex-wrap: wrap;
 }
 
-.session-info {
-  flex: 1;
-  min-width: 300px;
+.session-info-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 200px;
+  max-width: 200px;
 }
 
-.session-actions {
+.session-info-box h4 {
+  flex: 1;
+  min-width: 300px;
+  text-wrap: wrap;
+  max-width: 200px;
+}
+
+.session-actions-box {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
   min-width: 200px;
+  margin: auto;
 }
 
 .session-actions button {
@@ -415,7 +454,8 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex: 1;
-  min-width: 120px;
+  min-width: 130px;
+  max-width: 170px;
 }
 
 /* QR CODE MODAL */

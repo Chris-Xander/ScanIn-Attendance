@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/config';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import QRCode from 'react-qr-code';
 import './AdminQRCodes.css';
 
+
 const AdminQRCodes = () => {
+	const navigate = useNavigate();
 	const { currentUser } = useAuth();
 	const [showCreateForm, setShowCreateForm] = useState(false);
 	const [qrCodes, setQrCodes] = useState([]);
@@ -186,9 +189,6 @@ const AdminQRCodes = () => {
 					onClick={() => setShowCreateForm(!showCreateForm)}
 				>
 					+ Create New QR Code
-				</button>
-				<button className="admin-qr-action-btn" disabled>
-					View Reports
 				</button>
 			</div>
 

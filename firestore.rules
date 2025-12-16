@@ -19,8 +19,14 @@ service cloud.firestore {
     // Sessions collection - multi-day sessions
     match /sessions/{sessionId} {
       allow read: if true; // Public read for checking in
-      allow write: if request.auth != null && request.auth.uid == resource.data.adminId;
-      allow create: if request.auth != null; // Admin creates sessions
+      allow create: if request.auth != null; // Authenticated users may create (admins typically)
+      // Allow update/delete if the requester is the session owner (adminId),
+      // or has an admin custom claim, or if the document lacks adminId (migration case)
+      allow update, delete: if request.auth != null && (
+        resource.data.adminId == request.auth.uid
+        || request.auth.token.admin == true
+        || !("adminId" in resource.data)
+      );
     }
 
     // Devices collection - device token to member mapping
@@ -81,6 +87,17 @@ service cloud.firestore {
       allow create: if true; // anyone can add their device ID
       allow read: if true; // anyone can check if their deviceId exists
       allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid; // admin control
+    }
+
+    // Attendance logs - participants can create their own check-ins, admins can read
+    match /attendanceLogs/{logId} {
+      allow create: if request.auth != null; // authenticated users can log attendance
+      allow read: if request.auth != null && resource.data.adminId == request.auth.uid;
+      allow update: if request.auth != null && resource.data.adminId == request.auth.uid;
+      allow delete: if request.auth != null && (
+        resource.data.adminId == request.auth.uid ||
+        !('adminId' in resource.data)  // Allow delete if adminId field doesn't exist (for migration)
+      );
     }
 
     // Default deny all other access

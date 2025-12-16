@@ -156,6 +156,8 @@
   border-radius: 14px;
   box-shadow: 0 2px 12px rgba(33, 150, 243, 0.08);
   padding: 2rem 1.5rem;
+  max-height:400px;
+  height: 100%;
   min-width: 220px;
   max-width: 260px;
   flex: 1 1 220px;
@@ -163,6 +165,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 0.8rem;
 }
 
 .feature-card h3 {
@@ -170,11 +173,25 @@
   font-size: 1.2rem;
   font-weight: 700;
   margin-bottom: 0.7rem;
+  margin: auto;
 }
 
 .feature-card p {
   color: #444;
+  display: flex;
+  justify-content: center;
+  text-align: center;
   font-size: 1rem;
+  margin-top: -8px;
+  align-items: center ;
+}
+
+.qr-code-icon {
+  display: flex;
+  justify-content: center;
+  margin: auto;
+  padding: 5px;
+  
 }
 
 .landing-footer {
@@ -260,5 +277,50 @@
   }
   .feature-card {
     max-width: 60%;
+  }
+}
+
+@media (max-width: 400px) {
+  .checkmark-icon {
+    max-width: 185px;
+    max-height: 200px;
+    margin-left: 40px;
+    padding: 0;
+  }
+
+  .landing-title {
+    font-size: 2.2rem;
+  }
+  .landing-tagline {
+    font-size: 1.1rem;
+    text-align: center;
+  }
+  .landing-hero-content h2 {
+    font-size: 1.5rem;
+    text-align: center;
+  }
+  .landing-hero h2 {
+    text-align: center;
+    padding: 5px;
+    margin: auto;
+  }
+  .landing-hero-content p {
+    font-size: 1rem;
+    text-align: center;
+  }
+  .landing-btn {
+    padding: 0.8rem 1.8rem;
+    font-size: 1rem;
+  }
+  .landing-btn-scan {
+    padding: 0.8rem 1.8rem;
+    font-size: 1rem;
+  }
+  .landing-btn-container {
+    margin: auto;
+  }
+  .feature-card {
+    max-width: 60%;
+    
   }
 }
