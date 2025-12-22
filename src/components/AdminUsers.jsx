@@ -4,6 +4,7 @@ import { db } from '../firebase/config';
 import { writeBatch, collection, addDoc, getDocs, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs as getAllDocs } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import QRCode from 'react-qr-code';
+import { deleteSession } from '../cloud_functions/sessionService'
 import './AdminUsers.css';
 
 function AdminUsers() {
@@ -116,17 +117,17 @@ function AdminUsers() {
 
     const handleSessionSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
+        setLoading(true);  
         try {
             const sessionId = `ses_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
             // Generate QR code value with session ID
-            const qrCodeValue = `${window.location.origin}/session-checkin/${sessionId}`;
+            const qrCodeValue = `${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${sessionId}`;
             
             const sessionData = {
                 ...sessionForm,
                 adminId: currentUser.uid,
-                sessionId,
+                sessionId, 
                 qrCodeValue,
                 createdAt: new Date(),
                 isActive: true,
@@ -305,111 +306,20 @@ function AdminUsers() {
 
         setLoading(true);
         try {
-            console.log('--- DEBUG: Deleting Session ---');
-            console.log('Current User ID:', currentUser?.uid);
-            console.log('Session ID:', sessionToDelete?.id, 'typeof:', typeof sessionToDelete?.id);
-            console.log('Session adminId:', sessionToDelete?.adminId);
+            const result = await deleteSession(sessionToDelete.id);
+            console.log(result.message);
 
+            // Update your UI state to remove the deleted session
+            setSessions(prev => prev.filter(session => session.id !== sessionToDelete.id));
 
-            // Verify the session belongs to current user
-            if (sessionToDelete.adminId !== currentUser.uid) {
-                console.error('Session does not belong to current user');
-                alert('You do not have permission to delete this session');
-                return;
-            }
-
-            // First, check what attendance logs exist for this session
-            console.log('Checking attendance logs...');
-            const allAttendanceQuery = query(
-                collection(db, 'attendanceLogs'),
-                where('sessionId', '==', sessionToDelete.id)
-            );
-            const allAttendanceSnapshot = await getDocs(allAttendanceQuery);
-            console.log('Total attendance logs found:', allAttendanceSnapshot.docs.length);
-
-            // Log details of each attendance log
-            allAttendanceSnapshot.docs.forEach((doc, index) => {
-                const data = doc.data();
-                console.log(`Attendance log ${index + 1}:`, {
-                    id: doc.id,
-                    adminId: data.adminId,
-                    sessionId: data.sessionId,
-                    participantName: data.participantName
-                });
-            });
-
-            // Delete attendance logs for this session that we have permission to delete
-            // This includes logs owned by current user OR logs without adminId (legacy)
-            // Use writeBatch for efficient batch deletion (max 500 operations per batch)
-            const logsToDelete = [];
-
-            for (const doc of allAttendanceSnapshot.docs) {
-                const data = doc.data();
-                const canDelete = (
-                    data.adminId === currentUser.uid || // Owned by current user
-                    !data.adminId // Legacy log without adminId
-                );
-
-                if (canDelete) {
-                    console.log('Will delete attendance log:', doc.id, {
-                        adminId: data.adminId,
-                        hasAdminId: !!data.adminId
-                    });
-                    logsToDelete.push(doc.ref);
-                } else {
-                    console.log('Skipping attendance log (not owned):', doc.id, {
-                        adminId: data.adminId
-                    });
-                }
-            }
-
-            console.log('Total attendance logs to delete:', logsToDelete.length);
-
-            if (logsToDelete.length > 0) {
-                console.log('Deleting attendance logs in batches...');
-
-                // Process deletions in batches of 500 (Firebase limit)
-                const batchSize = 500;
-                const batches = [];
-                for (let i = 0; i < logsToDelete.length; i += batchSize) {
-                    batches.push(logsToDelete.slice(i, i + batchSize));
-                }
-
-                console.log(`Processing ${batches.length} batch(es) of deletions`);
-
-                for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-                    const currentBatch = batches[batchIndex];
-                    const batch = writeBatch(db);
-
-                    console.log(`Processing batch ${batchIndex + 1}/${batches.length} with ${currentBatch.length} deletions`);
-
-                    currentBatch.forEach(docRef => {
-                        batch.delete(docRef);
-                    });
-
-                    await batch.commit();
-                    console.log(`Successfully committed batch ${batchIndex + 1}/${batches.length}`);
-                }
-
-                console.log('Successfully deleted all attendance logs');
-            } else {
-                console.log('No attendance logs to delete');
-            }
-
-            // Delete the session
-            console.log('Deleting session...');
-            await deleteDoc(doc(db, 'sessions', sessionToDelete.id));
-            console.log('Successfully deleted session');
+            // Show success message to user
+            alert('Session deleted successfully!');
 
             fetchSessions();
-            alert('Session and all associated attendance data deleted successfully!');
         } catch (error) {
-            console.error('Error deleting session:', error);
-            console.error('Error details:', {
-                code: error.code,
-                message: error.message,
-                stack: error.stack
-            });
+            console.error('Failed to delete session:', error);
+
+            // Show error message to user
             alert(`Failed to delete session: ${error.message}`);
         } finally {
             setLoading(false);
@@ -772,7 +682,7 @@ function AdminUsers() {
                         <div className="qr-modal-body">
                             <div className="qr-code-display">
                                 <QRCode
-                                    value={`${window.location.origin}/session-checkin/${selectedSession.id}`}
+                                    value={`${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${selectedSession.id}`}
                                     size={200}
                                 />
                             </div>
@@ -783,8 +693,8 @@ function AdminUsers() {
                                 <p><strong>Start:</strong> {selectedSession.startDate ? new Date(selectedSession.startDate).toLocaleString() : 'Not set'}</p>
                                 <p><strong>End:</strong> {selectedSession.endDate ? new Date(selectedSession.endDate).toLocaleString() : 'Not set'}</p>
                                 <p><strong>Status:</strong> {selectedSession.isActive ? 'Active' : 'Inactive'}</p>
-                                <p><strong>URL:</strong> <a href={`${window.location.origin}/session-checkin/${selectedSession.id}`} target="_blank" rel="noopener noreferrer">
-                                    {`${window.location.origin}/session-checkin/${selectedSession.id}`}
+                                <p><strong>URL:</strong> <a href={`${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${selectedSession.id}`} target="_blank" rel="noopener noreferrer">
+                                    {`${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${selectedSession.id}`}
                                 </a></p>
                             </div>
                         </div>

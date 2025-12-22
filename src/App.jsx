@@ -33,7 +33,7 @@ function App() {
             <Route path="/scan" element={<PublicScan />} />
             <Route path="/scan-form/:qrId" element={<ScanForm />} />
             <Route path="/participant-scan" element={<ParticipantScan/>}/>
-            <Route path="/session-checkin:sessionId" element={<SessionCheckin/>}/>
+            <Route path="/session-checkin/:sessionId" element={<SessionCheckin/>}/>
             <Route path="/reports" element={<GateReport/>}/>
             <Route 
               path="/member" 
