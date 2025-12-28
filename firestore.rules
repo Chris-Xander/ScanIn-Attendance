@@ -87,10 +87,17 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid; // admin control
     }
 
-    // Attendance logs - participants can create their own check-ins, admins can read
+    // Participants collection - session participants registered via CSV
+    match /participants/{participantId} {
+      allow read: if request.auth != null && resource.data.adminId == request.auth.uid || true; // Public read for check-in validation
+      allow create: if request.auth != null && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+    }
+
+    // Attendance logs - participants can create their own check-ins, public read for duplicate check, admins can update/delete
     match /attendanceLogs/{logId} {
-      allow create: if request.auth != null; // authenticated users can log attendance
-      allow read: if request.auth != null && resource.data.adminId == request.auth.uid;
+      allow create: if true; // Public creation for check-in via QR codes
+      allow read: if true; // Public read for duplicate check during check-in
       allow update: if request.auth != null && resource.data.adminId == request.auth.uid;
       allow delete: if request.auth != null && (
         resource.data.adminId == request.auth.uid ||

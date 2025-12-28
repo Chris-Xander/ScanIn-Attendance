@@ -15,6 +15,8 @@ function AdminUsers() {
     const [attendanceLogs, setAttendanceLogs] = useState([]);
     const [sessionAttendance, setSessionAttendance] = useState({});
     const [loading, setLoading] = useState(false);
+    const [showSessionSelectModal, setShowSessionSelectModal] = useState(false);
+    const [selectedSessionId, setSelectedSessionId] = useState(null);
     const batch = writeBatch(db);
 
 
@@ -350,7 +352,7 @@ function AdminUsers() {
             <div className="admin-db-form-container">
                 <div className="admin-db-form-csv">
                     <h3>Register Members via CSV</h3>
-                    <p>Upload a CSV file with columns: Name, Email/Phone (required)</p>
+                    <p>Upload a CSV file with columns: Name, Email & Phone then select Session to register members (required)</p>
                     <input
                         type="file"
                         accept=".csv,.xlsx,.xls"
@@ -362,7 +364,7 @@ function AdminUsers() {
                     )}
                     <div className="admin-db-btns">
                         <button
-                            onClick={handleCsvSubmit}
+                            onClick={() => setShowSessionSelectModal(true)}
                             disabled={!csvData.length || loading}
                             className="admin-db-open-btn"
                         >
@@ -595,6 +597,74 @@ function AdminUsers() {
         </>
     );
 
+            const handleCsvSubmitForSession = async (sessionId) => {
+            if (!csvData.length) {
+                alert('Please upload a CSV file first');
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const participantsRef = collection(db, 'participants');
+                const batch = [];
+                const errors = [];
+                const uniqueIdentifiers = new Set();
+
+                for (let i = 0; i < csvData.length; i++) {
+                    const row = csvData[i];
+                    const name = row.name || row.Name;
+                    const email = row.email || row.Email || row.phone || row.Phone || row.contact || row.Contact;
+
+                    if (!name || !email) {
+                        errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${email || 'missing'}`);
+                        continue;
+                    }
+
+                    const uniqueId = email.toLowerCase();
+                    if (uniqueIdentifiers.has(uniqueId)) {
+                        errors.push(`Row ${i + 1}: Duplicate identifier '${email}'`);
+                        continue;
+                    }
+                    uniqueIdentifiers.add(uniqueId);
+
+                    const participantData = {
+                        sessionId: sessionId,
+                        adminId: currentUser.uid,
+                        name,
+                        email: email.toLowerCase(),
+                        phone: row.phone || row.Phone || '',
+                        contact: row.contact || row.Contact || '',
+                        uniqueIdentifier: uniqueId,
+                        registeredAt: new Date(),
+                        status: 'registered' // or 'pending'
+                    };
+                    batch.push(addDoc(participantsRef, participantData));
+                }
+
+                if (errors.length > 0) {
+                    alert(`Validation errors found:\n${errors.join('\n')}\n\nOnly valid participants will be registered.`);
+                }
+
+                if (batch.length > 0) {
+                    await Promise.all(batch);
+                    alert(`Successfully registered ${batch.length} participants for the selected session!`);
+                    fetchSessions(); // Refresh session data if needed
+                } else {
+                    alert('No valid participants to register.');
+                }
+
+                setCsvData([]);
+                setCsvFile(null);
+                setSelectedSessionId(null);
+            } catch (error) {
+                console.error('Error registering participants:', error);
+                alert('Failed to register participants');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+
     const renderSessionDashboard = () => (
         <>
             <h2>Session Dashboard</h2>
@@ -701,6 +771,57 @@ function AdminUsers() {
                     </div>
                 </div>
             )}
+           {showSessionSelectModal && (
+    <div className="qr-modal-overlay" onClick={() => setShowSessionSelectModal(false)}>
+        <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="qr-modal-header">
+                <h2>Select Session for Member Registration</h2>
+                <button className="qr-modal-close" onClick={() => setShowSessionSelectModal(false)}>×</button>
+            </div>
+            <div className="qr-modal-body">
+                {sessions.length === 0 ? (
+                    <p>No sessions available. Please create a session first.</p>
+                ) : (
+                    <div className="session-selection-list">
+                        {sessions.map(session => (
+                            <div 
+                                key={session.id} 
+                                className={`session-selection-item ${selectedSessionId === session.id ? 'selected' : ''}`}
+                                onClick={() => setSelectedSessionId(session.id)}
+                            >
+                                <h4>{session.name}</h4>
+                                <p>{session.description}</p>
+                                <p><strong>Location:</strong> {session.location}</p>
+                                <p><strong>Date:</strong> {new Date(session.startDate).toLocaleDateString()}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                <div className="admin-db-btns" style={{marginTop: '20px'}}>
+                    <button
+                        onClick={() => setShowSessionSelectModal(false)}
+                        className="admin-db-open-btn"
+                        disabled={loading}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (selectedSessionId) {
+                                handleCsvSubmitForSession(selectedSessionId);
+                                setShowSessionSelectModal(false);
+                            }
+                        }}
+                        className="admin-db-open-btn"
+                        disabled={!selectedSessionId || loading}
+                    >
+                        {loading ? 'Registering...' : 'Confirm Registration'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
 
             {/* Delete Confirmation Modal */}
             {showDeleteModal && sessionToDelete && (

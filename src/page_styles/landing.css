@@ -1,7 +1,7 @@
 /* Landing Page Styles */
 .landing-bg {
   min-height: 100vh;
-  background: linear-gradient(120deg, #f9fafb 0%, #008cff 100%);
+  background: linear-gradient(120deg, #fbfaf9 0%, #008cff 100%);
   display: flex;
   flex-direction: column;
   align-items: center;

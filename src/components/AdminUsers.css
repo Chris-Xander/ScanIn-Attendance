@@ -458,6 +458,30 @@
   max-width: 170px;
 }
 
+.session-selection-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.session-selection-item {
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.session-selection-item:hover {
+    background-color: #f5f5f5;
+}
+
+.session-selection-item.selected {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+}
+
 /* QR CODE MODAL */
 .qr-modal-overlay {
   position: fixed;
