@@ -175,6 +175,7 @@
   font-weight: 600;
   border-radius: 15px;
   margin: auto;
+  color: #000000;
   
 }
 
@@ -294,10 +295,6 @@
 .admin-db-form button[type="submit"]:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.admin-db-delete-btn {
-
 }
 
 .admin-db-delete-btn:hover:not(:disabled) {

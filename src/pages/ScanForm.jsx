@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/config';
-import { doc, addDoc, collection, updateDoc, getDocs, getDoc, setDoc, query, where } from 'firebase/firestore';
+import { doc, addDoc, collection, updateDoc, getDocs, getDoc, setDoc, query, where, writeBatch, increment } from 'firebase/firestore';
 import { getDeviceId } from '../utility/deviceFingerprint.jsx';
-import '../page_styles/ScanForm.css';
+import '../page_styles/ScanFormStyling.css';
 
 
 function ScanForm() {
@@ -17,6 +17,7 @@ function ScanForm() {
 	const [formData, setFormData] = useState({});
 	const [submitting, setSubmitting] = useState(false);
 	const [submitted, setSubmitted] = useState(false);
+	const [optimisticSubmitted, setOptimisticSubmitted] = useState(false);
 
 	useEffect(() => {
 		async function fetchQRCodeData() {
@@ -65,7 +66,7 @@ function ScanForm() {
 					}
 				}
 
-				setQrCodeData(qrData);
+				setQrCodeData({ ...qrData, id: qrCode.id });
 
 				// Initialize dynamic form data
 				const initialFormData = {};
@@ -105,27 +106,28 @@ function ScanForm() {
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 		setSubmitting(true);
-		setError(null); // Clear any previous errors
+		setError(null);
+		setOptimisticSubmitted(true); // Immediate feedback
 
 		try {
 			console.log('Starting attendance submission...');
 
-			// Genrate Device Fingerprint
+			// Parallel execution of device ID generation and duplicate check
 			const deviceId = await getDeviceId();
-			console.log('Device ID created:', deviceId);
-
-			//check for multi submissions from the same device
-			const duplicateCheckRef = doc(db, 'formSubmitCheck', `${qrId}_${deviceId}`);
-			const duplicateCheckSnap = await getDoc(duplicateCheckRef);
+			const duplicateCheckSnap = await getDoc(doc(db, 'formSubmitCheck', `${qrId}_${deviceId}`));
 
 			if (duplicateCheckSnap.exists()) {
-				console.log('Multiple Submission Detected')
 				setError('You cannot submit more than 1 response!');
+				setOptimisticSubmitted(false);
 				setSubmitting(false);
 				return;
 			}
- 
-			const attendanceData = {
+
+			const batch = writeBatch(db);
+
+			// Add attendance record
+			const attendanceRef = doc(collection(db, 'attendanceRecords'));
+			batch.set(attendanceRef, {
 				qrCodeId: qrId,
 				qrCodeName: qrCodeData.name,
 				adminId: qrCodeData.adminId,
@@ -135,83 +137,65 @@ function ScanForm() {
 				location: qrCodeData.location,
 				eventType: qrCodeData.eventType,
 				...(currentUser && { memberId: currentUser.uid })
-			};
+			});
 
-			console.log('Submitting attendance record...');
-			const attendanceDocRef = await addDoc(collection(db, 'attendanceRecords'), attendanceData);
-			console.log('Attendance record submitted successfully:', attendanceDocRef.id); 
-
-            if (qrCodeData.requiresForm) {
-				console.log('Submitting form data...');
-                await setDoc(doc(db, 'formSubmitData', `${qrId}_${deviceId}`), {
-					attendanceRecordId: attendanceDocRef.id,
+			if (qrCodeData.requiresForm) {
+				// Add form data
+				const formRef = doc(db, 'formSubmitData', `${qrId}_${deviceId}`);
+				batch.set(formRef, {
+					attendanceRecordId: attendanceRef.id,
 					qrCodeId: qrId,
 					adminId: qrCodeData.adminId,
 					timestamp: new Date().toISOString(),
 					formData: formData,
 					deviceId,
 					...(currentUser && { memberId: currentUser.uid })
-                });
-				console.log('Form data submitted successfully');
+				});
 
-				// Add lightweight duplicate check record
-				await setDoc(doc(db, 'formSubmitCheck', `${qrId}_${deviceId}`), {
+				// Add duplicate check
+				const checkRef = doc(db, 'formSubmitCheck', `${qrId}_${deviceId}`);
+				batch.set(checkRef, {
 					qrCodeId: qrId,
 					deviceId
 				});
-				console.log('Duplicate check record added successfully');
-            }
-
-			// Update scan count (only if user is authenticated to avoid permissions error)
-			if (currentUser) {
-				console.log('Updating scan count...');
-				const qrCodesRef = collection(db, 'customQRCodes');
-				const qrCodesSnapshot = await getDocs(qrCodesRef);
-				const qrCodeDoc = qrCodesSnapshot.docs.find(doc => doc.data().qrId === qrId);
-
-				if (qrCodeDoc) {
-					const currentScanCount = qrCodeDoc.data().scanCount || 0;
-					console.log('Current scan count:', currentScanCount);
-					await updateDoc(doc(db, 'customQRCodes', qrCodeDoc.id), {
-						scanCount: currentScanCount + 1
-					});
-					console.log('Scan count updated successfully');
-				} else {
-					console.warn('QR code document not found for scan count update');
-				}
 			}
 
-			console.log('Attendance submission completed successfully');
+			// Update scan count atomically
+			if (currentUser) {
+				const qrRef = doc(db, 'customQRCodes', qrCodeData.id); // Assuming qrCodeData has the document ID
+				batch.update(qrRef, {
+					scanCount: increment(1)
+				});
+			}
+
+			await batch.commit();
+			console.log('All operations completed successfully');
 			setSubmitted(true);
 		} catch (err) {
 			console.error('Error submitting attendance:', err);
-			console.error('Error details:', {
-				message: err.message,
-				code: err.code,
-				stack: err.stack
-			});
 			setError(`Failed to submit attendance: ${err.message || 'Please try again.'}`);
+			setOptimisticSubmitted(false); // Revert on error
 		} finally {
 			setSubmitting(false);
 		}
 	};
 
-	if (loading) return <div className="member-bg"><h1>Loading...</h1></div>;
-	if (error) return <div className="member-bg"><h1>Error</h1><p>{error}</p></div>;
-	if (submitted) return <div className="member-bg"><h1>Attendance Recorded!</h1></div>;
+	if (loading) return <div className="scanform-bg"><h1>Loading...</h1></div>;
+	if (error) return <div className="scanform-bg"><h1>Error</h1><p>{error}</p></div>;
+	if (submitted || optimisticSubmitted) return <div className="scanform-bg"><h1>Attendance Recorded!</h1></div>;
 
 	return (
-		<div className="member-bg">
-			<div className="memberMain">
-				<div className="member-container">
-					<div className="scan-form-container">
+		<div className="scanform-bg">
+			<div className="scanform-main">
+				<div className="scanform-container">
+					<div className="scanform-form-container">
 						<h1>{qrCodeData.name}</h1>
 						<p>{qrCodeData.description}</p>
 
 						{qrCodeData.requiresForm ? (
-							<form onSubmit={handleSubmit} className="scan-form-form">
+							<form onSubmit={handleSubmit} className="scanform-form">
 								{qrCodeData.formFields.map(field => (
-									<div className="scan-form-group" key={field}>
+									<div className="scanform-group" key={field}>
 										<label>{field}{field.toLowerCase().includes('name') || field.toLowerCase().includes('email') ? ' *' : ''}</label>
 										{getInputType(field) === 'text' && !field.toLowerCase().includes('reason') && (
 											<input
@@ -221,7 +205,7 @@ function ScanForm() {
 												onChange={handleFormChange}
 												required={field.toLowerCase().includes('name') || field.toLowerCase().includes('email')}
 												placeholder={`Enter ${field}`}
-												className="scan-form-input"
+												className="scanform-input"
 											/>
 										)}
 										{getInputType(field) === 'email' && (
@@ -232,7 +216,7 @@ function ScanForm() {
 												onChange={handleFormChange}
 												required
 												placeholder={`Enter ${field}`}
-												className="scan-form-input"
+												className="scanform-input"
 											/>
 										)}
 										{getInputType(field) === 'tel' && (
@@ -242,7 +226,7 @@ function ScanForm() {
 												value={formData[field] || ''}
 												onChange={handleFormChange}
 												placeholder={`Enter ${field}`}
-												className="scan-form-input"
+												className="scanform-input"
 											/>
 										)}
 										{field.toLowerCase().includes('reason') && (
@@ -251,19 +235,19 @@ function ScanForm() {
 												value={formData[field] || ''}
 												onChange={handleFormChange}
 												placeholder={`Enter ${field}`}
-												className="scan-form-textarea"
+												className="scanform-textarea"
 											/>
 										)}
 									</div>
 								))}
-								<div className='submit-button-container'>
+								<div className='scanform-submit-container'>
 									<button type="submit" disabled={submitting}>
 										{submitting ? 'Submitting...' : 'Submit Attendance'}
 									</button>
 								</div>
 							</form>
 						) : (
-							<div>
+							<div className='scanform-message'>
 								<p>This QR code does not require additional information.</p>
 								<button onClick={handleSubmit}>Record Attendance</button>
 							</div>

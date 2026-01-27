@@ -2,7 +2,7 @@
 
 .member-container { 
     background: var(--m-panel);
-    border-radius: var(--m-radius-lg);
+    border-radius: 17px;
     padding: 24px;
     box-shadow: var(--m-shadow-soft);
     max-width: 640px;

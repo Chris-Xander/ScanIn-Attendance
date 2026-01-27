@@ -1,116 +1,143 @@
-import { Html5Qrcode } from 'html5-qrcode';
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import qrCodeIcon from '../assets/Icons/qr-code.png';
-import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
-import mockService from '../services/mockService';
-import { useAuth } from '../contexts/AuthContext';
-import '../page_styles/MemberClockin.css';
+import jsQR from "jsqr";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { db } from "../firebase/config";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import mockService from "../services/mockService";
+import { useAuth } from "../contexts/AuthContext";
+import "../page_styles/MemberClockin.css";
 
 const MemberClockin = ({ currentUser }) => {
-    const [scanResult, setScanResult] = useState(null);
-    const [scanning, setScanning] = useState(false);
-    const handledRef = useRef(false);
-    const scannerRef = useRef(null);
-    const navigate = useNavigate();
-    const { useMock } = useAuth();
+  const [scanning, setScanning] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const handledRef = useRef(false);
 
-    useEffect(() => {
-        if (!scanning) return;
-        const scanner = new Html5Qrcode('reader', {
-            fps: 7
+  const navigate = useNavigate();
+  const { useMock } = useAuth();
+
+  useEffect(() => {
+    if (!scanning) return;
+
+    startCamera();
+
+    return stopCamera;
+  }, [scanning]);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+
+      streamRef.current = stream;
+      videoRef.current.srcObject = stream;
+      videoRef.current.setAttribute("playsinline", true);
+      await videoRef.current.play();
+
+      requestAnimationFrame(scanFrame);
+    } catch (err) {
+      console.error("Camera error:", err);
+    }
+  };
+
+  const scanFrame = () => {
+    if (!videoRef.current || handledRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+    if (code?.data) {
+      handledRef.current = true;
+      handleScanSuccess(code.data);
+      stopCamera();
+      return;
+    }
+
+    requestAnimationFrame(scanFrame);
+  };
+
+  const handleScanSuccess = async (result) => {
+    // Custom QR URL
+    if (result.includes("/scan-form/")) {
+      const qrId = result.split("/scan-form/")[1];
+      if (qrId) {
+        navigate(`/scan-form/${qrId}`);
+        return;
+      }
+    }
+
+    // Legacy QR
+    if (!currentUser) return;
+
+    try {
+      if (useMock) {
+        mockService.data.attendanceRecords.push({
+          id: Date.now().toString(),
+          memberId: currentUser.uid,
+          adminId: result,
+          result,
+          timestamp: new Date(),
+          status: "clock-in",
         });
-        scannerRef.current = scanner;
+      } else {
+        await addDoc(collection(db, "attendanceRecords"), {
+          memberId: currentUser.uid,
+          adminId: result,
+          result,
+          timestamp: serverTimestamp(),
+          status: "clock-in",
+        });
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  };
 
-        scanner.render(success, error);
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  };
 
-        async function success(result) {
-            if (!handledRef.current) {
-                handledRef.current = true;
-                setScanResult(result);
-                scanner.clear();
+  const handleStartScanning = () => {
+    handledRef.current = false;
+    setScanning(true);
+  };
 
-                // Check if this is a custom QR code URL
-                if (result.includes('/scan-form/')) {
-                    // Extract the qrId from the URL
-                    const qrId = result.split('/scan-form/')[1];
-                    if (qrId) {
-                        // Navigate to the form page
-                        navigate(`/scan-form/${qrId}`);
-                        return;
-                    }
-                }
+  const handleStopScanning = () => {
+    setScanning(false);
+    stopCamera();
+  }
 
-                // Handle legacy QR codes (admin email)
-                if (currentUser) {
-                    try {
-                        if (useMock) {
-                            // Mock service - add to mock data
-                            const scanRecord = {
-                                id: Date.now().toString(),
-                                memberId: currentUser.uid,
-                                adminId: result,
-                                result,
-                                timestamp: new Date(),
-                                status: 'clock-in',
-                            };
-                            mockService.data.attendanceRecords.push(scanRecord);
-                        } else {
-                            // Real Firebase - save to Firestore
-                            await addDoc(collection(db, 'attendanceRecords'), {
-                                memberId: currentUser.uid,
-                                adminId: result,
-                                result,
-                                timestamp: serverTimestamp(),
-                                status: 'clock-in',
-                            });
-                        }
-                    } catch (err) {
-                        console.error('Failed to save attendance record:', err);
-                    }
-                }
-            }
-        }
+  return (
+    <div className="clockin-container">
+      <h1 className="member-title">Attendid</h1>
+      <p className="member-desc">Scan your QR code to clock in or out.</p>
 
-        function error(err) {
-            //scan error logic here
-            console.warn(err);
-        }
+      {!scanning && (
+        <button className="scan-btn" onClick={handleStartScanning}>
+          Start Scanning
+        </button>
+      )}
 
-        return () => {
-            scanner.clear().catch(() => {});
-        };
-    }, [scanning, currentUser, navigate]);
-
-    const handleStartScanning = () => {
-        setScanResult(null);
-        handledRef.current = false;
-        setScanning(true);
-    };
-
-    return (
-        <div className="clockin-container">
-            <h1 className="member-title">Attendid</h1>
-            <p className="member-desc">Scan your QR code to clock in or out.</p>
-            <img src={qrCodeIcon} alt="QR Code Icon" className="qr-code-icon" />
-
-            {scanResult ? (
-                <div className="scan-result success">
-                    <span>Success:</span> <a href={"http://" + scanResult}>{scanResult}</a>
-                </div>
-            ) : (
-                <>
-                    {!scanning && (
-                        <button className="scan-btn" onClick={handleStartScanning}>
-                            Start Scanning
-                        </button>
-                    )}
-                    {scanning && <div id='reader' className="qr-reader-box"></div>}
-                </>
-            )}
-        </div>
-    );
+      {scanning && (
+        <>
+          <video ref={videoRef} className="qr-video" />
+          <canvas ref={canvasRef} style={{ display: "none" }} />
+          <button className="stop-scan-button" onClick={handleStopScanning}>x</button>
+        </>
+      )}
+    </div>
+  );
 };
 
 export default MemberClockin;

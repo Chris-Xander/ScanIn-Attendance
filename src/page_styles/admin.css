@@ -11,12 +11,16 @@
 
 /* Main Admin Container */
 .AdminContainer {
-  min-height: 100vh;
-  background: linear-gradient(120deg, #e3f2fd 0%, #bbdefb 100%);
   font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-size: cover;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   background-position: center;
   padding-top: 80px; /* Account for fixed header */
+  background-image: url(../assets/images/freepik__background-lineargradientrgb73-using-this-color-as__64184.png);
+  background-repeat: no-repeat;
+  background-size: cover;
+  overflow: hidden;
 }
 
 /* Responsive Header */
@@ -313,6 +317,9 @@
   padding: 2rem 3rem;
   min-height: calc(100vh - 80px);
   overflow: hidden;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-image: url(../assets/images/freepik__background-lineargradientrgb73-using-this-color-as__64184.png);
 }
 
 /* Admin Header */
@@ -336,7 +343,7 @@
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  margin-top: 30px;
+  margin-top: 5px;
 }
 
 .Header-container h1 {
@@ -370,17 +377,26 @@
 
 /* Admin Content Area */
 .AdminContent {
-  background: linear-gradient(rgb(73, 168, 197) , rgb(148, 173, 209));
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   padding: 2rem;
-  max-height: 800px;
-  backdrop-filter: blur(10px);
-  overflow-x: auto;
-  overflow-y: auto;
   max-height: calc(100vh - 280px);
   flex: 1;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
+  overflow: auto;
+
+  /* Gradient + QR layered background */
+  background:
+    linear-gradient(rgb(142, 221, 245), rgb(148, 173, 209)),
+    url('../assets/images/qr-code.png');
+  background-size: cover, 600px;          /* Gradient covers container, QR is fixed size */
+  background-position: center, bottom right; /* Gradient center, QR bottom-right */
+  background-repeat: no-repeat, no-repeat;   /* Both layers don’t repeat */
+
+  background-origin: border-box;
+  background-clip: border-box;
 }
+
 
 /* Keyframe Animations */
 @keyframes fadeInUp {

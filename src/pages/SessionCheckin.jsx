@@ -90,17 +90,39 @@ function SessionCheckin() {
         setMessage('');
 
         try {
-            // Check if user has already checked in
+            // Check if session has expired
+            const now = new Date();
+            const sessionEndDate = session.endDate ? new Date(session.endDate) : null;
+
+            if (sessionEndDate && now > sessionEndDate) {
+                setMessage('This session has expired. Check-in is no longer available.');
+                return;
+            }
+
+            // Check if user has checked in within the last 24 hours
             const attendanceQuery = query(
                 collection(db, 'attendanceLogs'),
                 where('sessionId', '==', sessionId),
                 where('email', '==', checkinForm.email.toLowerCase())
             );
-            const existingCheckin = await getDocs(attendanceQuery);
+            
+            const existingCheckins = await getDocs(attendanceQuery);
 
-            if (!existingCheckin.empty) {
-                setMessage('You have already checked in to this session');
-                return;
+            if (!existingCheckins.empty) {
+                // Get the most recent check-in
+                const lastCheckin = existingCheckins.docs
+                    .sort((a, b) => b.data().checkInTime.toDate() - a.data().checkInTime.toDate())[0];
+
+                const lastCheckinTime = lastCheckin.data().checkInTime.toDate();
+                const now = new Date();
+                const hoursSinceLastCheckin = (now - lastCheckinTime) / (1000 * 60 * 60);
+
+                if (hoursSinceLastCheckin < 24) {
+                    const remainingHours = Math.ceil(24 - hoursSinceLastCheckin);
+                    setMessage(`Looks like you've already been checked in. To checkin again wait ${remainingHours} hours`);
+                    setCheckingIn(false);
+                    return;
+                }
             }
 
             // Create attendance log

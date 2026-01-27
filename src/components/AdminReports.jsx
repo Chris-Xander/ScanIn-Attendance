@@ -11,6 +11,8 @@ function AdminReports() {
     const [qrGateReports, setQrGateReports] = useState([]);
     const [loading, setLoading] = useState(true);
 
+
+
     const downloadQRDataAsExcel = async (qrCodeId, qrName) => {
         try {
             if (!currentUser) {
@@ -51,6 +53,10 @@ function AdminReports() {
         fetchQrGateReports();
         fetchSessions();
     }, [currentUser]);
+
+    function ExanpadableList ({ children}) {
+        const [expanded, setExpanded] = useState(false);
+    }
 
     const fetchQrGateReports = async () => {
         try {

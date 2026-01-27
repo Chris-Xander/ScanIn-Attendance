@@ -2,9 +2,10 @@
 
 .member-container-history {
   background: var(--m-panel);
-  border-radius: var(--m-radius-lg);
+  border-radius: 17px;
   padding: 20px;
   box-shadow: var(--m-shadow-soft);
+  height: auto;
 }
 
 .member-title { font-size: 1.4rem; margin-bottom: 6px; color: var(--m-accent); font-weight: 700 }

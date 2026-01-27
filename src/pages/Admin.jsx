@@ -5,6 +5,7 @@ import AdminQRCodes from '../components/AdminQRCodes';
 import AdminUsers from '../components/AdminUsers';
 import AdminReports from '../components/AdminReports';
 import ResponsiveNavbar from '../components/ResponsiveNavbar';
+import qrCode from "../assets/images/qrcutoutimg.png";
 import '../page_styles/admin.css';
 import '../components/ResponsiveNavbar.css';
 

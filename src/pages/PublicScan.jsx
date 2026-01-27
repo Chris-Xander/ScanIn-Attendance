@@ -47,7 +47,7 @@ function PublicScan() {
     <div className="member-bg">
       <div className="memberMain">
         <div className="member-container">
-          <h1 className="member-title">Scan QR iiCode</h1>
+          <h1 className="member-title">Scan QRCode</h1>
           <p className="member-desc">You can scan your QR code here!. To save your scan history and access more features, please <span style={{color:'#2196f3', fontWeight:600, cursor:'pointer'}} onClick={()=>navigate('/login')}>log in</span> or <span style={{color:'#2196f3', fontWeight:600, cursor:'pointer'}} onClick={()=>navigate('/signup')}>sign up</span>.</p>
           <img src={qrCodeIcon} alt="QR Code Icon" className="qr-code-icon" />
           {scanResult ? (

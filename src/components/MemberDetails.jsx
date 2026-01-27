@@ -41,41 +41,7 @@ const MemberDetails = ({ currentUser }) => {
         loadUserData();
     }, [currentUser, useMock, getUserData]);
 
-    // Handle photo upload
-    const handlePhotoUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
 
-        setLoading(true);
-        setError('');
-
-        try {
-            if (useMock) {
-                // Mock service - simulate upload
-                const mockUserIndex = mockService.data.users.findIndex(u => u.uid === currentUser.uid);
-                if (mockUserIndex !== -1) {
-                    mockService.data.users[mockUserIndex].profilePhotoURL = `mock-photo-${Date.now()}`;
-                }
-            } else {
-                // Real Firebase - upload to storage
-                const fileRef = ref(storage, `profile-photos/${currentUser.uid}/${file.name}`);
-                await uploadBytes(fileRef, file);
-                const photoURL = await getDownloadURL(fileRef);
-
-                // Update auth profile
-                await updateUserProfile({ photoURL });
-
-                // Update user data in Firestore
-                await updateUserData({ profilePhotoURL: photoURL });
-            }
-
-            setLoading(false);
-        } catch (err) {
-            console.error('Error uploading photo:', err);
-            setError('Failed to upload photo. Please try again.');
-            setLoading(false);
-        }
-    };
 
     // Handle phone number update
     const handlePhoneUpdate = async (newPhone) => {
@@ -116,42 +82,10 @@ const MemberDetails = ({ currentUser }) => {
             <p className="member-desc">Your personal and account details will be shown here.</p>
             <div className="profile-details-card">
                 {error && <div className="error-message">{error}</div>}
-                
-                <div className="profile-photo-section">
-                    <div className="profile-photo">
-                        {currentUser?.photoURL ? (
-                            <img 
-                                src={currentUser.photoURL}
-                                alt={currentUser?.displayName || 'Profile'} 
-                                className="profile-photo-img"
-                            />
-                        ) : (
-                            <div className="profile-photo-placeholder">
-                                {(currentUser?.displayName || 'U')[0].toUpperCase()}
-                            </div>
-                        )}
-                        {loading && <div className="photo-loading-overlay">Uploading...</div>}
-                    </div>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handlePhotoUpload}
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                    />
-                    <button 
-                        className="photo-upload-btn"
-                        onClick={() => fileInputRef.current.click()}
-                        disabled={loading}
-                    >
-                        {loading ? 'Uploading...' : 'Change Photo'}
-                    </button>
-                </div>
-
                 <div className="profile-info-section">
                     <div className="profile-details-row">
                         <span className="detail-label">Name</span>
-                        <span className="detail-value">{currentUser?.displayName || 'John Doe'}</span>
+                        <span className="detail-value">{currentUser?.displayName || 'John'}</span>
                     </div>
 
                     <div className="profile-details-row">
@@ -197,27 +131,6 @@ const MemberDetails = ({ currentUser }) => {
                                 </button>
                             </div>
                         )}
-                    </div>
-
-                    <div className="profile-details-row password-row">
-                        <span className="detail-label">Password</span>
-                        <div className="password-actions">
-                            <span className="detail-value password">
-                                {showPassword ? '********' : '••••••••'}
-                            </span>
-                            <button 
-                                className="password-toggle"
-                                onClick={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? 'Hide' : 'Show'}
-                            </button>
-                            <button 
-                                className="change-password-btn"
-                                onClick={handlePasswordChange}
-                            >
-                                Change
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>

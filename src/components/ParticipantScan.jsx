@@ -109,19 +109,38 @@ function ParticipantScan() {
                 return;
             }
 
-            // Check if already checked in
+            // Check if session has expired
+            const now = new Date();
+            const sessionEndDate = session.endDate ? new Date(session.endDate) : null;
+
+            if (sessionEndDate && now > sessionEndDate) {
+                alert('This session has expired. Check-in is no longer available.');
+                return;
+            }
+
+            // Check if user has checked in within the last 24 hours
             const attendanceRef = collection(db, 'attendanceLogs');
             const existingQuery = query(
                 attendanceRef,
                 where('participantId', '==', participant.id),
-                where('sessionId', '==', participant.sessionId),
-                where('logDate', '==', todayDate)
+                where('sessionId', '==', participant.sessionId)
             );
-            const existingSnapshot = await getDocs(existingQuery);
+            const existingCheckins = await getDocs(existingQuery);
 
-            if (!existingSnapshot.empty) {
-                alert('You have already checked in for this session.');
-                return;
+            if (!existingCheckins.empty) {
+                // Get the most recent check-in
+                const lastCheckin = existingCheckins.docs
+                    .sort((a, b) => b.data().checkInTime.toDate() - a.data().checkInTime.toDate())[0];
+
+                const lastCheckinTime = lastCheckin.data().checkInTime.toDate();
+                const now = new Date();
+                const hoursSinceLastCheckin = (now - lastCheckinTime) / (1000 * 60 * 60);
+
+                if (hoursSinceLastCheckin < 24) {
+                    const remainingHours = Math.ceil(24 - hoursSinceLastCheckin);
+                    alert(`You can check in again in ${remainingHours} hours`);
+                    return;
+                }
             }
 
             // Record attendance

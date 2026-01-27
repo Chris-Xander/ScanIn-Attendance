@@ -10,13 +10,10 @@
 	--m-accent-2: #0ea5e9;
 	--m-muted: #6b7280;
 	--m-panel: #ffffff;
-	--m-radius-lg: 12px;
-	--m-radius-sm: 8px;
-	--m-gap: 1rem;
 	--m-shadow-soft: 0 8px 32px rgba(16,24,40,0.06);
 	--m-shadow-tight: 0 4px 12px rgba(16,24,40,0.06);
 
-	box-sizing: border-box;
+
 	display: flex;
 	min-height: 100vh; /* fill viewport */
 	width: 100%;
@@ -27,86 +24,81 @@
 	color: #0f172a;
 }
 
-.member-container {
-	margin: auto;
-	padding: 10px;
-	background: var(--m-panel);
-	border-radius: var(--m-radius-lg);
-	box-shadow: var(--m-shadow-soft);
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-
-}
-
 /* Make all descendants use border-box to avoid sizing surprises */
-.member-bg *,
-.member-bg *::before,
-.member-bg *::after { box-sizing: inherit; }
+
 
 /* Page main wrapper used by Member.jsx */
-.member-bg .Member-main {
-	flex: 1 1 auto;
+.member-bg{
 	display: flex;
 	flex-direction: column;
-	width: 100%;
-	padding: 24px; /* inner padding */
-	min-height: 100vh;
+	background-image: url(../assets/images/freepik__background-lineargradientrgb73-using-this-color-as__64184.png);
+	background-size: cover;
+	background-repeat: no-repeat;
+	background-position: center;
+	overflow: hidden;
+}
+.Member-main {
+	display: flex;
+  	flex-direction: column;
+  	padding: 2rem 3rem;
+  	min-height: calc(100vh - 80px);
+  	overflow: hidden;
+  	background-repeat: no-repeat;
+  	background-size: cover;
+	margin-top: 100px;
 }
 
-.member-bg .Header-container {
+.Header-container {
 	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	margin-bottom: 18px;
+  	align-items: center;
+  	justify-content: space-between;
+  	flex-shrink: 0;
 }
 
 /* header title inside the member page */
-.member-bg .Header-container h1,
-.member-bg .Header-container h2 {
-	margin: 0;
-	font-size: 1.25rem;
-	font-weight: 700;
-	color: var(--m-accent);
-}
 
-.member-bg .MemberUser {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	color: var(--m-muted);
-	font-weight: 600;
-}
 
-/* Content area where components render */
-.member-bg .MemberContent {
-	width: 100%;
-	flex: 1 1 auto;
-	display: flex;
-	align-items: flex-start;
-	justify-content: center;
-}
 
 /* Center content cards inside AdminContent */
-.member-bg .MemberContent > * {
-	width: 100%;
-	max-width: 960px; /* responsive cap */
+.MemberContent > * {
+	border-radius: 12px;
+  	padding: 2rem;
+  	max-height: 400px;
+  	flex: 1;
+  	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  	backdrop-filter: blur(10px);
+  	overflow: auto;
+
+  	/* Gradient + QR layered background */
+  	background:
+    linear-gradient(rgb(255, 255, 255), rgb(213, 230, 255));
+  	background-size: cover, 600px;          /* Gradient covers container, QR is fixed size */
+  	background-position: center, bottom right; /* Gradient center, QR bottom-right */
+  	background-repeat: no-repeat, no-repeat;   /* Both layers don’t repeat */
+	max-width: 600px;
+	margin: auto; /* responsive cap */
+}
+
+.userName {
+	font-size: 1.4rem;
+	font-weight: 500;
+	color: rgb(18, 72, 78);
+	display: inline-block;
+	margin-top: 21px;
 }
 
 /* Responsive adjustments (page-level) */
 @media (max-width: 980px) {
-	.member-bg .Member-main { padding: 18px }
+	.Member-main { padding: 18px }
 }
 
 @media (max-width: 780px) {
-	.member-bg { flex-direction: column }
-	.member-bg .Member-main { padding: 14px }
+	.Member-main { padding: 14px }
 	
 }
 
 @media (max-width: 450px) {
-	.member-bg .Member-main { padding: 10px }
+	.Member-main { padding: 10px }
 	
 }
 
