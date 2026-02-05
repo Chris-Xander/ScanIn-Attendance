@@ -150,17 +150,18 @@
   justify-content: center;
   width: 100%;
 }
-
+ 
 .admin-db-session-form {
   background-color: rgb(238, 237, 237);
   padding: 10px;
-  max-height: 650px;
-  height: 100%;
+  height: auto;
   display: flex;
+  max-width: 850px;
   flex-direction: column;
   gap: 0.3rem;
   justify-content: center;
   margin-top: 10px;
+  margin: auto;
   border-radius: 15px;
 }
 
@@ -318,6 +319,7 @@
 .attendance-logs {
   margin-top: 2.5rem;
   margin-bottom: 2rem;
+  position: relative;
 }
 
 .members-list h3,
@@ -455,6 +457,17 @@
   max-width: 170px;
 }
 
+.geofence-default-button {
+  top: auto;
+  right: 10px;
+  font-size: small;
+  padding: 6px 9px;
+  height: 8px;
+  border-radius: 12px;
+  background-color: #5386b0;
+  
+}
+
 .session-selection-list {
     max-height: 300px;
     overflow-y: auto;
@@ -497,6 +510,25 @@
 
 .qr-modal-overlay.fade-in {
   animation: fadeInOverlay 0.3s ease;
+}
+
+.recent-checkin-delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 5px 8px;
+  background-color: rgb(216, 44, 35);
+  border-color: 1px black;
+  margin-right: 5px;
+  color: rgb(195, 195, 195);
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  transition: 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+}
+
+.recent-checkin-delete:hover {
+  background-color: rgb(255, 0, 0);
+  color: white;
+  transform: scale(1.05);
 }
 
 @keyframes fadeInOverlay {

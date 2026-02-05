@@ -4,7 +4,8 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  sendEmailVerification
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
@@ -23,26 +24,28 @@ export function AuthProvider({ children }) {
     return import.meta.env.VITE_USE_REAL_FIREBASE !== 'true';
   });
 
-  function signup(email, password, name, role) {
+  function signup (email, password, name, role) {
     return createUserWithEmailAndPassword(auth, email, password)
       .then(async (result) => {
         // Update profile with name and role
         await updateProfile(result.user, {
           displayName: name,
-          photoURL: role // Store role in photoURL for simplicity
+          photoURL: role// Using photoURL to store role for simplicity
         });
 
-        // Create user document in Firestore
         await setDoc(doc(db, 'users', result.user.uid), {
           email: email,
           displayName: name,
           role: role,
           createdAt: new Date(),
           phone: '',
-          profilePhotoURL: ''
+          photoURL: ''
         });
 
+        await sendEmailVerification(result.user);
+
         return result;
+
       });
   }
 

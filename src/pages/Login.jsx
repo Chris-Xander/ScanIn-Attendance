@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import '../page_styles/login.css';
 
@@ -17,6 +17,7 @@ function Login() {
         setError(''); // Clear error when switching login type
     };
 
+    
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -26,6 +27,11 @@ function Login() {
 
             // Attempt to login
             const result = await login(email, password);
+
+            if (!result.user.emailVerified) {
+                setError('PLease verify your email before logging in.');
+                return;// Early return if email not verified
+            }
 
             // Check if user role matches login type
             const userRole = result.user.photoURL; // We stored role in photoURL
@@ -128,7 +134,7 @@ function Login() {
                     </button>
                 </form>
                 <p className="login-signup-text">
-                    Don't have an account? <a href="/signup" className="login-signup-link">Sign up</a>
+                    Don't have an account? <Link to="/signup" className="login-signup-link">Sign up</Link>
                 </p>
             </div>
         </div>

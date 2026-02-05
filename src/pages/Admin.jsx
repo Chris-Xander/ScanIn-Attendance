@@ -83,7 +83,8 @@ function Admin() {
                     <h1>{activeSection.charAt(0).toUpperCase() + activeSection.slice(1)}</h1>
                     <div className="AdminUser">
                         <span>
-                         Admin</span> 
+                            {currentUser?.displayName || 'Admin'}
+                         </span> 
                     </div>
                 </header>
                 <section className="AdminContent">

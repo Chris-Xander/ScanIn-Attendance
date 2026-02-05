@@ -197,18 +197,15 @@ function ScanForm() {
 								{qrCodeData.formFields.map(field => (
 									<div className="scanform-group" key={field}>
 										<label>{field}{field.toLowerCase().includes('name') || field.toLowerCase().includes('email') ? ' *' : ''}</label>
-										{getInputType(field) === 'text' && !field.toLowerCase().includes('reason') && (
-											<input
-												type="text"
+										{field.toLowerCase().includes('reason') ? (
+											<textarea
 												name={field}
 												value={formData[field] || ''}
 												onChange={handleFormChange}
-												required={field.toLowerCase().includes('name') || field.toLowerCase().includes('email')}
 												placeholder={`Enter ${field}`}
-												className="scanform-input"
+												className="scanform-textarea"
 											/>
-										)}
-										{getInputType(field) === 'email' && (
+										) : getInputType(field) === 'email' ? (
 											<input
 												type="email"
 												name={field}
@@ -218,8 +215,15 @@ function ScanForm() {
 												placeholder={`Enter ${field}`}
 												className="scanform-input"
 											/>
-										)}
-										{getInputType(field) === 'tel' && (
+										) : getInputType(field) === 'date' ? (
+											<input
+												type="date"
+												name={field}
+												value={formData[field] || ''}
+												onChange={handleFormChange}
+												className="scanform-input scanform-date-input"
+											/>
+										) : getInputType(field) === 'tel' ? (
 											<input
 												type="tel"
 												name={field}
@@ -228,14 +232,15 @@ function ScanForm() {
 												placeholder={`Enter ${field}`}
 												className="scanform-input"
 											/>
-										)}
-										{field.toLowerCase().includes('reason') && (
-											<textarea
+										) : (
+											<input
+												type="text"
 												name={field}
 												value={formData[field] || ''}
 												onChange={handleFormChange}
+												required={field.toLowerCase().includes('name') || field.toLowerCase().includes('email')}
 												placeholder={`Enter ${field}`}
-												className="scanform-textarea"
+												className="scanform-input"
 											/>
 										)}
 									</div>

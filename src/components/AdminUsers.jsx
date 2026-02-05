@@ -19,6 +19,14 @@ function AdminUsers() {
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const batch = writeBatch(db);
 
+    // Create a deterministic identity key from name + email + contact
+    const createIdentityKey = (name, email, contact) => {
+        const n = (name || '').trim().toLowerCase();
+        const e = (email || '').trim().toLowerCase();
+        const c = (contact || '').replace(/\D/g, '');
+        return `${n}|${e}|${c}`;
+    };
+
 
     // Session form state
     const [sessionForm, setSessionForm] = useState({
@@ -38,6 +46,8 @@ function AdminUsers() {
     // Member registration state
     const [csvFile, setCsvFile] = useState(null);
     const [csvData, setCsvData] = useState([]);
+    const [csvValidationErrors, setCsvValidationErrors] = useState([]);
+    const [sessionValidationErrors, setSessionValidationErrors] = useState([]);
 
     // QR Code modal state
     const [showQRModal, setShowQRModal] = useState(false);
@@ -83,7 +93,7 @@ function AdminUsers() {
 
     const fetchAttendanceLogs = async () => {
         try {
-            const logsRef = collection(db, 'attendanceLogs');
+            const logsRef = collection(db, 'attendanceRecords');
             const q = query(logsRef, where('adminId', '==', currentUser.uid));
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -97,7 +107,7 @@ function AdminUsers() {
 
     const fetchSessionAttendance = async () => {
         try {
-            const logsRef = collection(db, 'attendanceLogs');
+            const logsRef = collection(db, 'attendanceRecords');
             const q = query(logsRef, where('adminId', '==', currentUser.uid));
             const snapshot = await getDocs(q);
             const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -170,6 +180,7 @@ function AdminUsers() {
         const file = e.target.files[0];
         if (file) {
             setCsvFile(file);
+            setCsvValidationErrors([]);
             const reader = new FileReader();
             reader.onload = (evt) => {
                 const data = evt.target.result;
@@ -192,24 +203,27 @@ function AdminUsers() {
         setLoading(true);
         try {
             const membersRef = collection(db, 'members');
+            const memberMetaRef = collection(db, 'memberMetadata');
             const batch = [];
             const errors = [];
             const uniqueIdentifiers = new Set();
+            let registeredCount = 0;
 
             for (let i = 0; i < csvData.length; i++) {
                 const row = csvData[i];
                 const name = row.name || row.Name;
-                const email = row.email || row.Email || row.phone || row.Phone || row.contact || row.Contact;
+                const email = row.email || row.Email || '';
+                const phone = row.phone || row.Phone || row.contact || row.Contact || '';
 
-                if (!name || !email) {
-                    errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${email || 'missing'}`);
+                if (!name || (!email && !phone)) {
+                    errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${(!email && !phone) ? 'missing' : 'present'}`);
                     continue;
                 }
 
-                // Check for uniqueness
-                const uniqueId = email.toLowerCase();
+                const normalizedPhone = (phone || '').toString();
+                const uniqueId = createIdentityKey(name, email, normalizedPhone);
                 if (uniqueIdentifiers.has(uniqueId)) {
-                    errors.push(`Row ${i + 1}: Duplicate identifier '${email}'`);
+                    errors.push(`Row ${i + 1}: Duplicate identifier for '${name}'`);
                     continue;
                 }
                 uniqueIdentifiers.add(uniqueId);
@@ -217,30 +231,43 @@ function AdminUsers() {
                 const memberData = {
                     adminId: currentUser.uid,
                     name,
-                    email: email.toLowerCase(),
-                    phone: row.phone || row.Phone || '',
-                    contact: row.contact || row.Contact || '',
-                    uniqueIdentifier: uniqueId, // For device token linking
+                    email: (email || '').toLowerCase(),
+                    phone: phone,
+                    uniqueIdentifier: uniqueId,
                     createdAt: new Date(),
                     memberID: `mem_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
                 };
+
+                // Store member record and a separate metadata doc for other fields
                 batch.push(addDoc(membersRef, memberData));
+                const meta = {
+                    adminId: currentUser.uid,
+                    uniqueIdentifier: uniqueId,
+                    name,
+                    email: (email || '').toLowerCase(),
+                    phone: phone,
+                    rawRow: row,
+                    createdAt: new Date()
+                };
+                batch.push(addDoc(memberMetaRef, meta));
+                registeredCount += 1;
             }
 
             if (errors.length > 0) {
+                setCsvValidationErrors(errors);
                 alert(`Validation errors found:\n${errors.join('\n')}\n\nOnly valid members will be registered.`);
             }
 
-            if (batch.length > 0) {
+            if (registeredCount > 0) {
                 await Promise.all(batch);
-                alert(`Successfully registered ${batch.length} members!`);
+                alert(`Successfully registered ${registeredCount} members!`);
                 fetchMembers();
             } else {
                 alert('No valid members to register.');
             }
-
             setCsvData([]);
             setCsvFile(null);
+            setCsvValidationErrors([]);
         } catch (error) {
             console.error('Error registering members:', error);
             alert('Failed to register members');
@@ -255,17 +282,39 @@ function AdminUsers() {
 
     const exportSessionAttendance = async (sessionId, sessionName) => {
         try {
+            // Fetch attendance logs
             const logsRef = collection(db, 'attendanceLogs');
             const q = query(logsRef, where('sessionId', '==', sessionId), where('adminId', '==', currentUser.uid));
-            const snapshot = await getDocs(q);
+            const logsSnapshot = await getDocs(q);
 
-            const attendanceData = snapshot.docs.map(doc => ({
-                participantName: doc.data().participantName,
-                email: doc.data().email,
-                uniqueCode: doc.data().uniqueCode,
-                checkInTime: doc.data().checkInTime?.toDate()?.toLocaleString(),
-                status: 'Present'
-            }));
+            // Fetch session member metadata
+            const metaRef = collection(db, 'sessionMemberData');
+            const metaQuery = query(metaRef, where('sessionId', '==', sessionId), where('adminId', '==', currentUser.uid));
+            const metaSnapshot = await getDocs(metaQuery);
+
+            // Build a map of metadata by uniqueIdentifier
+            const metadataMap = {};
+            metaSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                metadataMap[data.uniqueIdentifier] = data;
+            });
+
+            // Merge attendance logs with metadata
+            const attendanceData = logsSnapshot.docs.map(doc => {
+                const logData = doc.data();
+                const meta = metadataMap[logData.uniqueIdentifier] || {};
+                const rawRow = meta.rawRow || {};
+                
+                return {
+                    name: logData.participantName,
+                    email: logData.email || meta.email || '',
+                    phone: meta.phone || '',
+                    uniqueIdentifier: logData.uniqueIdentifier,
+                    checkInTime: logData.checkInTime?.toDate()?.toLocaleString() || '',
+                    status: 'Present',
+                    ...rawRow // Include all raw CSV fields
+                };
+            });
 
             if (attendanceData.length === 0) {
                 alert('No attendance data found for this session');
@@ -351,16 +400,29 @@ function AdminUsers() {
             {/* CSV Upload Form */}
             <div className="admin-db-form-container">
                 <div className="admin-db-form-csv">
-                    <h3>Register Members via CSV</h3>
+                    <h3>Register Members via CSV</h3> 
                     <p>Upload a CSV file with columns: Name, Email & Phone then select Session to register members (required)</p>
+                    <h3>Enter required form details</h3>
+                    
                     <input
                         type="file"
-                        accept=".csv,.xlsx,.xls"
+                        accept=".csv,.xlsx,.xls,.word"
                         onChange={handleCsvUpload}
                         style={{marginBottom: '10px'}}
                     />
                     {csvData.length > 0 && (
                         <p>Found {csvData.length} rows in the uploaded file.</p>
+                    )}
+                    {csvValidationErrors.length > 0 && (
+                        <div className="admin-db-errors" style={{marginTop: '10px', border: '1px solid #f44336', padding: '10px', borderRadius: '4px', background: '#fff6f6'}}>
+                            <strong style={{color: '#b71c1c'}}>Validation errors:</strong>
+                            <ul style={{marginTop: '6px'}}>
+                                {csvValidationErrors.map((err, idx) => (
+                                    <li key={idx} style={{color: '#333'}}>{err}</li>
+                                ))}
+                            </ul>
+                            <button className="admin-db-delete-btn" onClick={() => setCsvValidationErrors([])} style={{marginTop: '8px'}}>Clear Errors</button>
+                        </div>
                     )}
                     <div className="admin-db-btns">
                         <button
@@ -432,8 +494,11 @@ function AdminUsers() {
 
     const renderSessionManagement = () => (
         <>
-            <h2>Session Management</h2>
+            
+            <div className='session-mang-descrip'>
+                <h2>Session Management</h2>
             <p>Create and manage attendance sessions with pre-registered participants.</p>
+            </div>
 
             {/* Create Session Form */}
             <div className="admin-db-form-container-session">
@@ -495,8 +560,9 @@ function AdminUsers() {
                             value={sessionForm.maxParticipants}
                             onChange={(e) => setSessionForm({...sessionForm, maxParticipants: e.target.value})}
                         />
-
-                        <label style={{marginTop: '1.5rem', fontWeight: 'bold', color: '#f44336'}}>Geofence Settings (Optional)</label>
+                      <div>
+                        <label style={{marginTop: '1.5rem', fontWeight: 'bold', color: '#f44336'}}>Geofence Settings (Optional)</label> <button className='geofence-default-button'>Default</button>
+                        <p>: Default automatically selects your devices location</p>
                         
                         <div style={{display: 'grid', gap: '10px'}}>
                             <div style={{flex: 1}}>
@@ -541,6 +607,8 @@ function AdminUsers() {
                                 />
                             </div>
                         </div>
+                      </div>
+
 
                         <div className="admin-db-btns">
                             <button type="submit" className="admin-db-open-btn" disabled={loading}>
@@ -606,23 +674,27 @@ function AdminUsers() {
             setLoading(true);
             try {
                 const participantsRef = collection(db, 'participants');
+                const metaRef = collection(db, 'sessionMemberData');
                 const batch = [];
                 const errors = [];
                 const uniqueIdentifiers = new Set();
+                let registeredCount = 0;
 
                 for (let i = 0; i < csvData.length; i++) {
                     const row = csvData[i];
                     const name = row.name || row.Name;
-                    const email = row.email || row.Email || row.phone || row.Phone || row.contact || row.Contact;
+                    const email = row.email || row.Email || '';
+                    const phone = row.phone || row.Phone || row.contact || row.Contact || '';
 
-                    if (!name || !email) {
-                        errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${email || 'missing'}`);
+                    if (!name || (!email && !phone)) {
+                        errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${(!email && !phone) ? 'missing' : 'present'}`);
                         continue;
                     }
 
-                    const uniqueId = email.toLowerCase();
+                    const normalizedPhone = (phone || '').toString();
+                    const uniqueId = createIdentityKey(name, email, normalizedPhone);
                     if (uniqueIdentifiers.has(uniqueId)) {
-                        errors.push(`Row ${i + 1}: Duplicate identifier '${email}'`);
+                        errors.push(`Row ${i + 1}: Duplicate identifier for '${name}'`);
                         continue;
                     }
                     uniqueIdentifiers.add(uniqueId);
@@ -631,23 +703,36 @@ function AdminUsers() {
                         sessionId: sessionId,
                         adminId: currentUser.uid,
                         name,
-                        email: email.toLowerCase(),
-                        phone: row.phone || row.Phone || '',
-                        contact: row.contact || row.Contact || '',
+                        email: (email || '').toLowerCase(),
+                        phone: phone,
                         uniqueIdentifier: uniqueId,
                         registeredAt: new Date(),
-                        status: 'registered' // or 'pending'
+                        status: 'registered'
                     };
                     batch.push(addDoc(participantsRef, participantData));
+
+                    const meta = {
+                        sessionId: sessionId,
+                        adminId: currentUser.uid,
+                        uniqueIdentifier: uniqueId,
+                        name,
+                        email: (email || '').toLowerCase(),
+                        phone: phone,
+                        rawRow: row,
+                        registeredAt: new Date()
+                    };
+                    batch.push(addDoc(metaRef, meta));
+                    registeredCount += 1;
                 }
 
                 if (errors.length > 0) {
+                    setSessionValidationErrors(errors);
                     alert(`Validation errors found:\n${errors.join('\n')}\n\nOnly valid participants will be registered.`);
                 }
 
-                if (batch.length > 0) {
+                if (registeredCount > 0) {
                     await Promise.all(batch);
-                    alert(`Successfully registered ${batch.length} participants for the selected session!`);
+                    alert(`Successfully registered ${registeredCount} participants for the selected session!`);
                     fetchSessions(); // Refresh session data if needed
                 } else {
                     alert('No valid participants to register.');
@@ -656,6 +741,7 @@ function AdminUsers() {
                 setCsvData([]);
                 setCsvFile(null);
                 setSelectedSessionId(null);
+                setSessionValidationErrors([]);
             } catch (error) {
                 console.error('Error registering participants:', error);
                 alert('Failed to register participants');
@@ -685,26 +771,6 @@ function AdminUsers() {
                     <p>{attendanceLogs.filter(log =>
                         new Date(log.checkInTime?.toDate()).toDateString() === new Date().toDateString()
                     ).length}</p>
-                </div>
-            </div>
-
-            {/* Recent Attendance Logs */}
-            <div className="attendance-logs">
-                <h3>Recent Check-ins</h3>
-                <div className="logs-list">
-                    {attendanceLogs.slice(0, 10).map(log => (
-                        <div key={log.id} className="log-item">
-                            <div className="log-info">
-                                <strong>{log.participantName}</strong>
-                                <p>{log.email}</p>
-                                <p>Session: {log.sessionName}</p>
-                            </div>
-                            <div className="log-time">
-                                {log.checkInTime?.toDate()?.toLocaleString()}
-                            </div>
-                        </div>
-                    ))}
-                    {attendanceLogs.length === 0 && <p>No recent check-ins.</p>}
                 </div>
             </div>
         </>
@@ -750,6 +816,17 @@ function AdminUsers() {
                             <button className="qr-modal-close" onClick={closeQRModal}>×</button>
                         </div>
                         <div className="qr-modal-body">
+                        {sessionValidationErrors.length > 0 && (
+                            <div className="admin-db-errors" style={{marginBottom: '12px', border: '1px solid #f44336', padding: '10px', borderRadius: '4px', background: '#fff6f6'}}>
+                                <strong style={{color: '#b71c1c'}}>Validation errors:</strong>
+                                <ul style={{marginTop: '6px'}}>
+                                    {sessionValidationErrors.map((err, idx) => (
+                                        <li key={idx} style={{color: '#333'}}>{err}</li>
+                                    ))}
+                                </ul>
+                                <button className="admin-db-delete-btn" onClick={() => setSessionValidationErrors([])} style={{marginTop: '8px'}}>Clear Errors</button>
+                            </div>
+                        )}
                             <div className="qr-code-display">
                                 <QRCode
                                     value={`${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${selectedSession.id}`}

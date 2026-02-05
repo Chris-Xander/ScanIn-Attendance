@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebase/config';
-import { collection, doc, getDoc, addDoc, query, where, getDocs, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, getDocs, setDoc } from 'firebase/firestore';
+import { submitAttendance } from '../utility/attendanceManager';
 import './SessionCheckin.css';
 
 function SessionCheckin() {
@@ -101,7 +102,7 @@ function SessionCheckin() {
 
             // Check if user has checked in within the last 24 hours
             const attendanceQuery = query(
-                collection(db, 'attendanceLogs'),
+                collection(db, 'attendanceRecords'),
                 where('sessionId', '==', sessionId),
                 where('email', '==', checkinForm.email.toLowerCase())
             );
@@ -125,16 +126,24 @@ function SessionCheckin() {
                 }
             }
 
-            // Create attendance log
-            await addDoc(collection(db, 'attendanceLogs'), {
+            // Create attendance record (centralized: enforces geofence when configured)
+            const uniqueCode = generateUniqueCode();
+            await submitAttendance({
+                memberId: participant?.memberId || null,
                 sessionId,
-                sessionName: session.name,
-                participantName: checkinForm.name,
+                deviceToken: null,
+                captureLocation: true,
+                memberName: checkinForm.name,
                 email: checkinForm.email.toLowerCase(),
                 phone: checkinForm.phone || '',
-                checkInTime: new Date(),
-                uniqueCode: generateUniqueCode(),
-                adminId: session.adminId
+                extra: {
+                    participantId: participant?.id || null,
+                    participantName: checkinForm.name,
+                    uniqueCode,
+                    adminId: session.adminId,
+                    sessionName: session.name,
+                    status: 'present'
+                }
             });
 
             // Save device recognition for future visits
@@ -144,7 +153,7 @@ function SessionCheckin() {
             setCheckinForm({ name: '', email: '', phone: '' });
         } catch (error) {
             console.error('Error during check-in:', error);
-            setMessage('Check-in failed. Please try again.');
+            setMessage(error.message || 'Check-in failed. Please try again.');
         } finally {
             setCheckingIn(false);
         }

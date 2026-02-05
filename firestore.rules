@@ -78,7 +78,8 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         resource.data.adminId == request.auth.uid
         || request.auth.token.admin == true // allow admin users with custom claim 'admin'
-      ); // only admin or owner
+        || request.auth.uid == get(/databases/$(database)/documents/customQRCodes/$(resource.data.qrCodeId)).data.adminId // allow if user is the QR code creator
+      ); // admin, owner, or QR code creator
       allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
     }
 
@@ -92,8 +93,41 @@ service cloud.firestore {
     // Participants collection - session participants registered via CSV
     match /participants/{participantId} {
       allow read: if request.auth != null && resource.data.adminId == request.auth.uid || true; // Public read for check-in validation
-      allow create: if request.auth != null && request.resource.data.adminId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+      // Allow creation when the authenticated user is the admin for the session or has an 'admin' custom claim
+      allow create: if request.auth != null && (
+        request.resource.data.adminId == request.auth.uid ||
+        request.auth.token.admin == true
+      );
+      allow update, delete: if request.auth != null && (
+        resource.data.adminId == request.auth.uid ||
+        request.auth.token.admin == true
+      );
+    }
+
+    // Member metadata - store raw CSV rows and extra fields for members
+    match /memberMetadata/{metaId} {
+      allow read: if request.auth != null && resource.data.adminId == request.auth.uid || false;
+      allow create: if request.auth != null && (
+        request.resource.data.adminId == request.auth.uid ||
+        request.auth.token.admin == true
+      );
+      allow update, delete: if request.auth != null && (
+        resource.data.adminId == request.auth.uid ||
+        request.auth.token.admin == true
+      );
+    }
+
+    // Session member metadata - store raw CSV rows and extra fields for participants per session
+    match /sessionMemberData/{metaId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (
+        request.resource.data.adminId == request.auth.uid ||
+        request.auth.token.admin == true
+      );
+      allow update, delete: if request.auth != null && (
+        resource.data.adminId == request.auth.uid ||
+        request.auth.token.admin == true
+      );
     }
 
     // Attendance logs - participants can create their own check-ins, public read for duplicate check, admins can update/delete

@@ -6,16 +6,32 @@ import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, i
 import QRCode from 'react-qr-code';
 import './AdminQRCodes.css';
 
+// Visual skeleton for loading QR code list
+function QRSkeleton({ count = 6 }) {
+	return (
+		<div className="qr-skeleton-list">
+			{Array.from({ length: count }).map((_, i) => (
+				<div key={i} className="qr-skeleton-item">
+					<div className="skeleton-rect skeleton-title" />
+					<div className="skeleton-rect skeleton-line" />
+					<div className="skeleton-rect skeleton-line short" />
+				</div>
+			))}
+		</div>
+	);
+}
+
 
 const AdminQRCodes = () => {
 	const navigate = useNavigate();
 	const { currentUser } = useAuth();
 	const [showCreateForm, setShowCreateForm] = useState(false);
 	const [qrCodes, setQrCodes] = useState([]);
-	const [loading, setLoading] = useState(false);
 	const [showQRModal, setShowQRModal] = useState(false);
 	const [selectedQR, setSelectedQR] = useState(null);
 	const PRODUCTION_BASE_URL = 'https://Chris-Xander.github.io/ScanIn-Attendance';
+	const [fetching, setFetching] = useState(false); // for read/list skeleton
+	const [submitting, setSubmitting] = useState(false); // for create/update submissions
 	const [formData, setFormData] = useState({
 		name: '',
 		description: '',
@@ -36,6 +52,7 @@ const AdminQRCodes = () => {
 
 	const fetchQRCodes = async () => {
 		try {
+			setFetching(true);
 			if (!currentUser) {
 				console.log('No current user; skipping fetch.');
 				setQrCodes([]);
@@ -50,6 +67,8 @@ const AdminQRCodes = () => {
 			console.log(`Fetched ${codes.length} QR codes.`);
 		} catch (error) {
 			console.error('Error fetching QR codes:', error);
+		} finally {
+			setFetching(false);
 		}
 	};
 
@@ -59,7 +78,7 @@ const AdminQRCodes = () => {
 			...prev,
 			[name]: type === 'checkbox' ? checked : value
 		}));
-	};
+	};// handle form change when creating new QR code
 
 	const addField = () => {
 		const trimmed = newField.trim();
@@ -70,7 +89,7 @@ const AdminQRCodes = () => {
 			}));
 		}
 		setNewField('');
-	};
+	};// addField
 
 	const removeField = (field) => {
 		setFormData(prev => ({
@@ -85,7 +104,7 @@ const AdminQRCodes = () => {
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
-		setLoading(true);
+		setSubmitting(true);
 
 		try {
 			const qrId = generateQRId();
@@ -99,6 +118,7 @@ const AdminQRCodes = () => {
 
 			// Create QR code in customQRCodes collection
 			const qrDocRef = await addDoc(collection(db, 'customQRCodes'), qrData);
+			
 
 			// Create corresponding QR-Gate report item in qrGateReports collection
 			const gateReportData = {
@@ -141,7 +161,7 @@ const AdminQRCodes = () => {
 			console.error('Error creating QR code:', error);
 			alert('Failed to create QR code. Please try again.');
 		} finally {
-			setLoading(false);
+			setSubmitting(false);
 		}
 	};
 
@@ -318,9 +338,9 @@ const AdminQRCodes = () => {
 							</label>
 						</div>
 						<div className="form-actions">
-							<button type="submit" disabled={loading}>
-								{loading ? 'Creating...' : 'Create QR Code'}
-							</button>
+								<button type="submit" disabled={submitting}>
+									{submitting ? 'Creating...' : 'Create QR Code'}
+								</button>
 							<button type="button" onClick={() => setShowCreateForm(false)}>
 								Cancel
 							</button>
@@ -331,7 +351,10 @@ const AdminQRCodes = () => {
 
 			{/* QR Codes List */}
 			<div className="admin-qr-list">
-				{qrCodes.length === 0 ? (
+				{fetching ? (
+					<QRSkeleton count={6} />
+				) :
+				qrCodes.length === 0 ? (
 					<div className="admin-qr-empty">
 						<p>No QR codes found. Click "Create New QR Code" to get started.</p>
 					</div>

@@ -27,9 +27,13 @@ function Signup() {
             
             // Create user account
             await signup(email, password, name, role);
+            setError('Verication email sent! Please check your mail to complete the signup process.');
             
-            // Navigate to appropriate page
-            navigate(role === 'admin' ? '/admin' : '/member');
+            // Redirect to login page after successful signup
+            setTimeout(() => {
+                navigate('/login');
+            }, 3000);
+
         } catch (error) {
             console.error('Signup error:', error);
             if (error.code === 'auth/email-already-in-use') {

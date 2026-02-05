@@ -83,12 +83,42 @@
 
 .scan-result { padding: 10px 12px; border-radius: 8px; background: #f1fbf6; color: #047857 }
 
-@media (max-width: 980px) {
-  .qr-reader-box { width:220px; height:220px }
+@media (max-width: 1145px) {
+  .clockin-container {
+  background: var(--m-panel);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--m-shadow-soft);
+  background-color: rgb(255, 255, 255);
+  margin: auto;
+  margin-top: 10px;
+  height: 650px;
+  max-width: 700px;
+  width: 80%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
 }
 
 @media (max-width: 450px) {
-  .qr-reader-box { width:180px; height:180px }
+  .clockin-container {
+    background: var(--m-panel);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: var(--m-shadow-soft);
+    background-color: rgb(255, 255, 255);
+    margin: auto;
+    margin-top: 10px;
+    max-height: 220px;
+    max-width: 700px;
+    width: 80%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
 }
 
 /* Centering rules specific to clockin component to override global behavior */

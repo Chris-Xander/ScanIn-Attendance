@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/config';
-import { collection, query, where, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { submitAttendance } from '../utility/attendanceManager';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import '../page_styles/ParticipantScan.css';
 
@@ -118,8 +119,8 @@ function ParticipantScan() {
                 return;
             }
 
-            // Check if user has checked in within the last 24 hours
-            const attendanceRef = collection(db, 'attendanceLogs');
+            // Check if user has checked in within the last 24 hours (canonical collection)
+            const attendanceRef = collection(db, 'attendanceRecords');
             const existingQuery = query(
                 attendanceRef,
                 where('participantId', '==', participant.id),
@@ -143,18 +144,24 @@ function ParticipantScan() {
                 }
             }
 
-            // Record attendance
-            await addDoc(collection(db, 'attendanceLogs'), {
-                participantId: participant.id,
+            // Record attendance via centralized submitAttendance (includes geofence validation)
+            await submitAttendance({
+                memberId: participant.memberId || null,
                 sessionId: participant.sessionId,
-                participantName: participant.name,
+                deviceToken: null,
+                captureLocation: true,
+                memberName: participant.name,
                 email: participant.email,
-                uniqueCode: participant.uniqueCode,
-                checkInTime: new Date(),
-                adminId: session.adminId,
-                sessionName: session.name,
-                scannedData: qrData,
-                logDate: todayDate,
+                extra: {
+                    participantId: participant.id,
+                    participantName: participant.name,
+                    uniqueCode: participant.uniqueCode,
+                    adminId: session.adminId,
+                    sessionName: session.name,
+                    scannedData: qrData,
+                    logDate: todayDate,
+                    status: 'present'
+                }
             });
 
             alert(`Check-in successful! Welcome to ${session.name}, ${participant.name}!`);

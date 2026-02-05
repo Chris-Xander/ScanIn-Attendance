@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { db } from '../firebase/config';
-import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 
 function MigrationHelper() {
@@ -90,6 +90,69 @@ function MigrationHelper() {
                 error: error.message,
                 success: false
             });
+            setProgress('Migration failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const migrateAttendanceLogsToRecords = async () => {
+        if (!currentUser) {
+            alert('You must be logged in to run migration');
+            return;
+        }
+
+        setLoading(true);
+        setProgress('Starting migration to attendanceRecords...');
+        setResults(null);
+
+        try {
+            const logsRef = collection(db, 'attendanceLogs');
+            const snapshot = await getDocs(logsRef);
+
+            setProgress(`Found ${snapshot.docs.length} attendance logs to migrate...`);
+
+            const creations = [];
+            let processed = 0;
+
+            for (const docSnap of snapshot.docs) {
+                const logData = docSnap.data();
+
+                // Map fields to canonical attendanceRecords schema
+                const record = {
+                    sessionId: logData.sessionId || null,
+                    sessionName: logData.sessionName || logData.sessionName || null,
+                    participantId: logData.participantId || null,
+                    memberId: logData.memberId || null,
+                    participantName: logData.participantName || logData.participantName || null,
+                    memberName: logData.memberName || logData.participantName || null,
+                    email: logData.email || '',
+                    phone: logData.phone || '',
+                    checkInTime: logData.checkInTime || new Date(),
+                    uniqueCode: logData.uniqueCode || null,
+                    adminId: logData.adminId || null,
+                    status: logData.status || 'present',
+                    location: logData.location || null,
+                    scannedData: logData.scannedData || null,
+                    migratedFrom: docSnap.id
+                };
+
+                creations.push(setDoc(doc(db, 'attendanceRecords', docSnap.id), record));
+
+                processed++;
+                if (processed % 10 === 0) setProgress(`Migrated ${processed}/${snapshot.docs.length}...`);
+            }
+
+            if (creations.length > 0) {
+                setProgress(`Finalizing ${creations.length} record creations...`);
+                await Promise.all(creations);
+            }
+
+            setResults({ total: snapshot.docs.length, migrated: creations.length, success: true });
+            setProgress('Migration to attendanceRecords completed successfully!');
+        } catch (error) {
+            console.error('Migration error:', error);
+            setResults({ error: error.message, success: false });
             setProgress('Migration failed');
         } finally {
             setLoading(false);

@@ -51,7 +51,8 @@
 .Header-container {
 	display: flex;
   	align-items: center;
-  	justify-content: space-between;
+  	justify-content: center;
+	gap: 1rem;
   	flex-shrink: 0;
 }
 
@@ -85,6 +86,7 @@
 	color: rgb(18, 72, 78);
 	display: inline-block;
 	margin-top: 21px;
+	margin-right: 13px;
 }
 
 /* Responsive adjustments (page-level) */

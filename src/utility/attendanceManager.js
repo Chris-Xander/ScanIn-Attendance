@@ -17,10 +17,14 @@ import { getDeviceLocation, isWithinGeofence } from './deviceTokenManager';
  * @returns {Promise<Object>} Created attendance record
  */
 export const submitAttendance = async ({
-  memberId,
+  memberId = null,
   sessionId,
-  deviceToken,
-  captureLocation = false
+  deviceToken = null,
+  captureLocation = false,
+  memberName: memberDisplayName = null,
+  email = null,
+  phone = null,
+  extra = {}
 }) => {
   try {
     // Get session details for geofence validation
@@ -39,29 +43,38 @@ export const submitAttendance = async ({
       // Validate geofence if configured
       if (sessionData.geofence && sessionData.geofence.latitude && sessionData.geofence.longitude) {
         if (!isWithinGeofence(location, sessionData.geofence)) {
-          throw new Error('You are outside the geofence for this session');
+          throw new Error('You are outside the geofence for this session! Please move to the required location to check in.');
         }
       }
     }
     
-    // Get member details for display
-    const memberDoc = await getDoc(doc(db, 'members', memberId));
+    // Get member details for display (support optional anonymous check-ins)
     let memberName = 'Unknown';
-    if (memberDoc.exists()) {
-      memberName = memberDoc.data().name;
+    if (memberId) {
+      try {
+        const memberDoc = await getDoc(doc(db, 'members', memberId));
+        if (memberDoc.exists()) {
+          memberName = memberDoc.data().name;
+        }
+      } catch (err) {
+        console.warn('Error fetching member doc:', err);
+      }
+    } else if (memberDisplayName) {
+      memberName = memberDisplayName;
     }
     
     // Create attendance record
     const attendanceRef = collection(db, 'attendanceRecords');
     const attendanceData = {
-      memberId,
+      memberId: memberId || null,
       sessionId,
-      deviceToken,
+      deviceToken: deviceToken || null,
       memberName,
+      participantName: extra.participantName || memberName,
       sessionName: sessionData.name,
       timestamp: serverTimestamp(),
       checkInTime: new Date(),
-      status: 'present',
+      status: extra.status || 'present',
       ...(location && {
         location: {
           latitude: location.latitude,
@@ -69,7 +82,10 @@ export const submitAttendance = async ({
           accuracy: location.accuracy,
           capturedAt: location.timestamp
         }
-      })
+      }),
+      ...(email && { email }),
+      ...(phone && { phone }),
+      ...extra
     };
     
     const docRef = await addDoc(attendanceRef, attendanceData);

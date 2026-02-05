@@ -4,12 +4,32 @@ import { db } from '../firebase/config';
 import { collection, getDocs, doc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import './AdminReports.css';
+import AttendanceMatrix from './AttendanceMatrix';
+
+// Simple skeleton used while fetching reports
+function QRSkeleton({ count = 4 }) {
+    return (
+        <div className="qr-skeleton-list">
+            {Array.from({ length: count }).map((_, i) => (
+                <div key={i} className="qr-skeleton-item">
+                    <div className="skeleton-rect skeleton-title" />
+                    <div className="skeleton-rect skeleton-line" />
+                    <div className="skeleton-rect skeleton-line short" />
+                </div>
+            ))}
+        </div>
+    );
+}
 
 function AdminReports() {
     const [sessions, setSessions] = useState([]);
     const { currentUser } = useAuth();
     const [qrGateReports, setQrGateReports] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetching, setFetching] = useState(true); // controls skeletons for reports
+    const [showMatrix, setShowMatrix] = useState(false);
+    const [matrixMode, setMatrixMode] = useState(null);
+    const [matrixTargetId, setMatrixTargetId] = useState(null);
 
 
 
@@ -50,8 +70,13 @@ function AdminReports() {
     };
 
     useEffect(() => {
-        fetchQrGateReports();
-        fetchSessions();
+        const init = async () => {
+            setFetching(true);
+            await fetchQrGateReports();
+            await fetchSessions();
+            setFetching(false);
+        };
+        init();
     }, [currentUser]);
 
     function ExanpadableList ({ children}) {
@@ -188,10 +213,8 @@ function AdminReports() {
             <h2>Gate Report</h2>
             <p>View and manage QR-Gate reports for all created QR codes.</p>
 
-            {loading ? (
-                <div className="loading-state">
-                    <p>Loading QR-Gate reports...</p>
-                </div>
+            {fetching ? (
+                <QRSkeleton count={4} />
             ) : qrGateReports.length === 0 ? (
                 <div className="empty-state">
                     <p>No QR-Gate reports found. Create a QR code first to see reports here.</p>
@@ -230,6 +253,12 @@ function AdminReports() {
                                     Download Responses
                                 </button>
                                 <button
+                                    className="view-data-btn"
+                                    onClick={() => { setMatrixMode('qr'); setMatrixTargetId(report.qrCodeId); setShowMatrix(true); }}
+                                >
+                                    View Data
+                                </button>
+                                <button
                                     className="toggle-status-btn"
                                     onClick={() => toggleActiveStatus(report.id, report.isActive)}
                                 >
@@ -255,7 +284,9 @@ function AdminReports() {
                 <h3>Session Attendance Reports</h3>
                 <p>Export attendance data for your pre-registered sessions.</p>
 
-                {sessions.length === 0 ? (
+                {fetching ? (
+                    <QRSkeleton count={4} />
+                ) : sessions.length === 0 ? (
                     <div className="empty-state">
                         <p>No sessions found. Create a session first to see reports here.</p>
                     </div>
@@ -282,12 +313,27 @@ function AdminReports() {
                                         onClick={() => exportSessionAttendance(session.id, session.name)} disabled={loading}>
                                         {loading ? 'Exporting...' : 'Export Data'}
                                     </button>
+                                    <button
+                                        className="view-data-btn"
+                                        onClick={() => { setMatrixMode('session'); setMatrixTargetId(session.id); setShowMatrix(true); }}
+                                    >
+                                        View Data
+                                    </button>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
+
+            {showMatrix && (
+                <AttendanceMatrix
+                    mode={matrixMode}
+                    sessionId={matrixMode === 'session' ? matrixTargetId : undefined}
+                    qrCodeId={matrixMode === 'qr' ? matrixTargetId : undefined}
+                    onClose={() => { setShowMatrix(false); setMatrixMode(null); setMatrixTargetId(null); }}
+                />
+            )}
 
         </div>
     );
