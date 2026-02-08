@@ -76,6 +76,10 @@
   .admin-qr-list {
     gap: 0.7rem;
   }
+  .qr-code-actions {
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 456px) {

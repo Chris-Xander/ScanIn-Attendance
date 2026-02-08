@@ -7,7 +7,6 @@ service cloud.firestore {
     }
 
     // DEVICE TOKEN BASED ATTENDANCE SYSTEM
-    // ====================================
 
     // Members collection - pre-registered members via CSV
     match /members/{memberId} {
@@ -37,7 +36,7 @@ service cloud.firestore {
     // Attendance Records - new collection for device-token based attendance
     match /attendanceRecords/{recordId} {
       allow create: if true; // Anyone can submit attendance
-      allow read: if request.auth != null; // Only authenticated users can read
+      allow read: if true; // Public read for duplicate check during check-in
       allow update, delete: if request.auth != null; // Admin control
     }
 
@@ -92,7 +91,7 @@ service cloud.firestore {
 
     // Participants collection - session participants registered via CSV
     match /participants/{participantId} {
-      allow read: if request.auth != null && resource.data.adminId == request.auth.uid || true; // Public read for check-in validation
+      allow read: if true; // Public read for check-in validation
       // Allow creation when the authenticated user is the admin for the session or has an 'admin' custom claim
       allow create: if request.auth != null && (
         request.resource.data.adminId == request.auth.uid ||
@@ -128,6 +127,14 @@ service cloud.firestore {
         resource.data.adminId == request.auth.uid ||
         request.auth.token.admin == true
       );
+    }
+
+    // Session device bindings - track device-user bindings per session
+    match /sessionDeviceBindings/{bindingId} {
+      allow create: if true; // Public creation for device binding
+      allow read: if true; // Public read for binding validation
+      allow update: if request.auth != null && resource.data.adminId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.adminId == request.auth.uid;
     }
 
     // Attendance logs - participants can create their own check-ins, public read for duplicate check, admins can update/delete

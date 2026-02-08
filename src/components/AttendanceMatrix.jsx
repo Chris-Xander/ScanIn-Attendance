@@ -171,7 +171,7 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                                     {matrix.map((row, idx) => (
                                         <tr key={row.id}>
                                             <td>{idx + 1}</td>
-                                            <td className="name-col" onClick={() => setSelectedRow(row)} style={{ cursor: 'pointer' }} title="View registration details">{row.name}</td>
+                                            <td className="name-col" onClick={() => setSelectedRow(row)} style={{ cursor: 'pointer' }} title="View details">{row.name}</td>
                                             {days.map(day => {
                                                 const cell = row.days[day];
                                                 return (

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import '../App.css';
 import '../page_styles/landing.css';
 import qrIllustration from '../assets/illustrations/vecteezy_qr-code-scanning-vector-illustration-concept-suitable-for_7278490.jpg';
@@ -103,6 +103,12 @@ function Landing() {
           <h2>Download Attendid</h2>
           <p>Install as a PWA from your browser or download the APK (coming soon).</p>
           <button className="landing-btn" onClick={() => window.alert('Use your browser/s install option or check back soon for APK!')}>Download</button>
+        </div>
+        <div className="landing-footer-links">
+          <Link to="/privacy-policy" className="footer-link">  Privacy Policy  | </Link>
+          <Link to="/user-agreement" className="footer-link"> User Agreement  |</Link>
+          <Link to="/data-retention-policy" className="footer-link">  Data-Retention Policy  |</Link>
+          <Link to="/cookie-policy" className="footer-link">  Cookie Policy</Link>
         </div>
         <p className="landing-copyright">&copy; {new Date().getFullYear()} ScanIn. All rights reserved.</p>
       </footer>

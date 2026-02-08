@@ -63,7 +63,9 @@
   font-size: 2rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
+  font-family:Georgia, 'Times New Roman', Times, serif;
   letter-spacing: 0.5px;
+  text-decoration: underline;
 }
 
 .tab-content > p {
@@ -314,9 +316,7 @@
 }
 
 /* MEMBERS AND SESSIONS LISTS */
-.members-list,
-.sessions-list,
-.attendance-logs {
+.sessions-list {
   margin-top: 2.5rem;
   margin-bottom: 2rem;
   position: relative;
@@ -349,15 +349,17 @@
 }
 
 /* MEMBER ITEM */
-.member-item,
+
 .session-item {
   background: #fff;
   border: 1.5px solid #e3e8ee;
   border-radius: 12px;
+  max-width: 600px;;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
   box-shadow: 0 2px 8px rgba(33, 150, 243, 0.06);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 0.5rem;
 }
 
 .member-item:hover,
@@ -407,14 +409,6 @@
 }
 
 /* SESSION ITEM ACTIONS */
-.session-item {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 2rem;
-  flex-wrap: wrap;
-}
 
 .session-info-box {
   display: flex;
@@ -422,6 +416,7 @@
   justify-content: center;
   min-width: 200px;
   max-width: 200px;
+  margin: auto;
 }
 
 .session-info-box h4 {
@@ -458,11 +453,12 @@
 }
 
 .geofence-default-button {
-  top: auto;
-  right: 10px;
+  position: absolute;
+  bottom: auto;
+  font-style: italic;
+  color: #fff;
+  font-weight: bold;
   font-size: small;
-  padding: 6px 9px;
-  height: 8px;
   border-radius: 12px;
   background-color: #5386b0;
   
@@ -750,6 +746,13 @@
 }
 
 /* RESPONSIVE DESIGN */
+@media (max-width: 1880px) {
+  .session-item {
+    max-width: 600px;
+    margin: auto;
+  }
+
+}
 @media (max-width: 768px) {
   .tab-navigation {
     gap: 0.5rem;
@@ -889,13 +892,16 @@
     font-size: 0.85rem;
   }
 
-  .member-item,
-  .session-item {
-    padding: 1rem;
-  }
-
   .session-actions {
     flex-direction: column;
+  }
+
+  .session-info-box h4 {
+    min-width: auto;
+    max-width: 80%;
+    text-align: center;
+    margin: auto;
+    gap: 1rem;
   }
 
   .session-actions button {
@@ -928,4 +934,12 @@
   .log-item {
     padding: 0.75rem;
   }
+
+  .geofence-default-button {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    position: relative;
+    margin-top: 5px;
+    margin-bottom: -10px;
+}
 }

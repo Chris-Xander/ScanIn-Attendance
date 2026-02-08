@@ -212,6 +212,76 @@
     background: #2196f3;
 }
 
+.view-participants-btn {
+    background: #4caf50;
+    color: white;
+    padding: 0.7rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.view-participants-btn:hover {
+    background: #388e3c;
+}
+
+.session-participants-container {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e3e8ee;
+}
+
+.session-participants-container h5 {
+    margin: 0 0 1rem 0;
+    color: #1976d2;
+    font-size: 1rem;
+}
+
+.participants-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.participant-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e3e8ee;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.participant-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.participant-info strong {
+    color: #1976d2;
+    font-size: 0.9rem;
+}
+
+.participant-info span {
+    color: #666;
+    font-size: 0.8rem;
+}
+
+.no-participants {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 1rem;
+}
+
 
 /* Responsive Design */
 @media (max-width: 768px) {

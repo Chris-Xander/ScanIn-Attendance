@@ -1,16 +1,13 @@
-# Pre-Registered Session Attendance Feature Implementation
+# TODO: Add Edit and Remove Functionality for Participants in AdminUsers.jsx
 
-## Completed Tasks
-- [ ] Analyze codebase and create implementation plan
-- [ ] Get user approval for plan
-- [x] Update Firestore Security Rules (sessions, participants, attendanceLogs collections)
-
-## Pending Tasks
-- [ ] Integrate Session Management into AdminUsers.jsx (tabs for User Management, Session Management, Session Dashboard)
-- [ ] Create ParticipantScan.jsx component for QR scanning during sessions
-- [ ] Update AdminReports.jsx to add session-based export functionality
-- [ ] Update App.jsx routing to add participant scan route
-- [ ] Test Firebase integration
-- [ ] Verify CSV parsing and validation
-- [ ] Test QR scanning with uniqueCode mapping
-- [ ] Ensure real-time updates work
+## Tasks
+- [x] Add state variables for editing mode, remove modal, and edit form data
+- [x] Implement handleEditParticipant function to update email/phone in Firestore
+- [x] Implement handleRemoveParticipant function to delete participant from Firestore
+- [x] Add confirmation modal for removing participants
+- [x] Modify participant-item rendering to include inline editing for email/phone
+- [x] Add action buttons (Edit/Save/Cancel/Remove) to participant items
+- [x] Update both first participant display and expanded list with new functionality
+- [x] Test edit and remove functionality
+- [x] Ensure Firestore updates correctly
+- [x] Check UI styling for new elements

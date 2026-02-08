@@ -100,13 +100,66 @@ function SessionCheckin() {
                 return;
             }
 
+            // Get device ID
+            const deviceId = getCookie('scanin_device_id') || generateDeviceId();
+            const userEmail = checkinForm.email.toLowerCase();
+            const fingerprint = generateFingerprint();
+
+            // Check if any device with the same fingerprint has already checked in for this session
+            const devicesQuery = query(
+                collection(db, 'devices'),
+                where('fingerprint', '==', fingerprint)
+            );
+            const devicesSnapshot = await getDocs(devicesQuery);
+
+            for (const deviceDoc of devicesSnapshot.docs) {
+                const deviceIdToCheck = deviceDoc.id;
+                const bindingQuery = query(
+                    collection(db, 'sessionDeviceBindings'),
+                    where('sessionId', '==', sessionId),
+                    where('deviceId', '==', deviceIdToCheck)
+                );
+                const bindingSnapshot = await getDocs(bindingQuery);
+                if (!bindingSnapshot.empty) {
+                    setMessage(`This device has already been used to check in for this session. Please use a different device or contact the organizer.`);
+                    setCheckingIn(false);
+                    return;
+                }
+            }
+
+            // Check device binding for this session (additional check with current device ID)
+            const bindingQuery = query(
+                collection(db, 'sessionDeviceBindings'),
+                where('sessionId', '==', sessionId),
+                where('deviceId', '==', deviceId)
+            );
+            const bindingSnapshot = await getDocs(bindingQuery);
+
+            if (!bindingSnapshot.empty) {
+                // Device is already bound in this session to some user - prevent multiple check-ins per device
+                setMessage(`This device has already been used to check in for this session. Please use a different device or contact the organizer.`);
+                setCheckingIn(false);
+                return;
+            } else {
+                // No binding exists - create one
+                const bindingId = `${sessionId}_${deviceId}`;
+                await setDoc(doc(db, 'sessionDeviceBindings', bindingId), {
+                    sessionId,
+                    deviceId,
+                    userEmail,
+                    userName: checkinForm.name,
+                    boundAt: new Date(),
+                    adminId: session.adminId
+                });
+            }
+
             // Check if user has checked in within the last 24 hours
             const attendanceQuery = query(
                 collection(db, 'attendanceRecords'),
                 where('sessionId', '==', sessionId),
-                where('email', '==', checkinForm.email.toLowerCase())
+                where('email', '==', userEmail)
             );
-            
+
             const existingCheckins = await getDocs(attendanceQuery);
 
             if (!existingCheckins.empty) {
@@ -131,10 +184,10 @@ function SessionCheckin() {
             await submitAttendance({
                 memberId: participant?.memberId || null,
                 sessionId,
-                deviceToken: null,
+                deviceToken: deviceId,
                 captureLocation: true,
                 memberName: checkinForm.name,
-                email: checkinForm.email.toLowerCase(),
+                email: userEmail,
                 phone: checkinForm.phone || '',
                 extra: {
                     participantId: participant?.id || null,
@@ -147,7 +200,7 @@ function SessionCheckin() {
             });
 
             // Save device recognition for future visits
-            await saveDeviceRecognition(checkinForm.email.toLowerCase());
+            await saveDeviceRecognition(userEmail);
 
             setMessage('Check-in successful! Welcome to the session.');
             setCheckinForm({ name: '', email: '', phone: '' });

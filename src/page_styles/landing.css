@@ -1,7 +1,7 @@
 /* Landing Page Styles */
 .landing-bg {
   min-height: 100vh;
-  background: linear-gradient(120deg, #fbfaf9 0%, #77b2e2 100%);
+  background: linear-gradient(120deg, #fbfaf9 0%, #0084f0 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -219,6 +219,8 @@
   animation-name: slideInRight;
 }
 
+
+
 @keyframes slideInLeft {
   from {
     opacity: 0;
@@ -276,6 +278,17 @@
   margin-top: auto;
 }
 
+.landing-footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+  font-size: 13px;
+  color: #11395a;
+  text-decoration: none;
+  font-style: italic;
+}
+
 .landing-download-section {
   margin-bottom: 1.5rem;
 }
@@ -295,7 +308,7 @@
 
 .landing-copyright {
   color: #1976d2;
-  font-size: 0.98rem;
+  font-size: 0.78rem;
   margin-top: 1.5rem;
 }
 
@@ -396,5 +409,10 @@
   .feature-card {
     max-width: 60%;
     
+  }
+  .landing-footer-links {
+    gap: 0.2rem;
+    font-size: 10.5px;
+    text-wrap: wrap;
   }
 }

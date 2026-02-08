@@ -30,6 +30,7 @@ function AdminReports() {
     const [showMatrix, setShowMatrix] = useState(false);
     const [matrixMode, setMatrixMode] = useState(null);
     const [matrixTargetId, setMatrixTargetId] = useState(null);
+    
 
 
 
@@ -43,26 +44,56 @@ function AdminReports() {
             const formQuery = query(formRef, where('qrCodeId', '==', qrCodeId), where('adminId', '==', currentUser.uid));
             const snapshot = await getDocs(formQuery);
 
-            const filtered = snapshot.docs.map(d => ({
-                ...d.data().formData,
-                memberId: d.data().memberId || "N/A",
-                timestamp: d.data().timestamp,
-            }));
-
-            if (filtered.length === 0) {
+            if (snapshot.empty) {
                 console.log('No responses found for QR Code');
                 alert('No responses found to download for this QR Code.');
                 return;
             }
 
-            // Convert to Excel sheet
-            const worksheet = XLSX.utils.json_to_sheet(filtered);
+            // Build matrix: rows = respondent (memberId or anon id), cols = date
+            const rowsByMember = new Map();
+            const dateSet = new Set();
+
+            snapshot.docs.forEach(docSnap => {
+                const data = docSnap.data();
+                const ts = data.timestamp || data.submittedAt || null;
+                const dateObj = ts && typeof ts.toDate === 'function' ? ts.toDate() : (ts ? new Date(ts) : new Date());
+                const dateKey = dateObj.toISOString().split('T')[0];
+                dateSet.add(dateKey);
+
+                const memberKey = data.memberId || data.formData?.name || docSnap.id;
+                if (!rowsByMember.has(memberKey)) rowsByMember.set(memberKey, {});
+
+                // record presence/time
+                const timeStr = dateObj.toLocaleTimeString();
+                rowsByMember.get(memberKey)[dateKey] = timeStr;
+            });
+
+            const sortedDates = Array.from(dateSet).sort();
+
+            // Build header
+            const header = ['Member', ...sortedDates.map(d => {
+                const dateObj = new Date(d);
+                const weekday = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
+                const dateLabel = dateObj.toLocaleDateString();
+                return `${weekday} ${dateLabel}`;
+            })];
+
+            const sheetRows = [header];
+            // Populate rows
+            Array.from(rowsByMember.keys()).sort().forEach(memberKey => {
+                const rowObj = rowsByMember.get(memberKey);
+                const row = [memberKey];
+                sortedDates.forEach(d => {
+                    row.push(rowObj[d] || '');
+                });
+                sheetRows.push(row);
+            });
+
+            const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Responses");
-
-            const fileName = `${qrName}_Responses.xlsx`;
-
-            XLSX.writeFile(workbook, fileName);
+            XLSX.writeFile(workbook, `${qrName}_Responses_Matrix.xlsx`);
         } catch (err) {
             console.error("There was an error downloading the responses: ", err);
             alert("Failed to generate report.");
@@ -151,24 +182,50 @@ function AdminReports() {
                 alert('No attendance records found for this session');
                 return;
             }
+            // Build matrix: rows = memberName (or memberId), cols = date
+            const rowsByMember = new Map();
+            const dateSet = new Set();
 
-            const attendanceData = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    memberName: data.memberName || 'Unknown',
-                    memberId: data.memberId || 'N/A',
-                    deviceToken: data.deviceToken || 'N/A',
-                    checkInTime: data.checkInTime ? new Date(data.checkInTime).toLocaleString() : 'N/A',
-                    status: data.status || 'present',
-                    location: data.location ? `${data.location.latitude}, ${data.location.longitude}` : 'N/A'
-                };
+            snapshot.docs.forEach(docSnap => {
+                const data = docSnap.data();
+                const ts = data.checkInTime || data.timestamp || null;
+                const dateObj = ts && typeof ts.toDate === 'function' ? ts.toDate() : (ts ? new Date(ts) : new Date());
+                const dateKey = dateObj.toISOString().split('T')[0];
+                dateSet.add(dateKey);
+
+                const memberKey = data.memberName || data.memberId || data.uniqueIdentifier || docSnap.id;
+                if (!rowsByMember.has(memberKey)) rowsByMember.set(memberKey, {});
+
+                // store earliest check-in time for that date
+                const timeStr = dateObj.toLocaleTimeString();
+                const existing = rowsByMember.get(memberKey)[dateKey];
+                if (!existing || timeStr < existing) {
+                    rowsByMember.get(memberKey)[dateKey] = timeStr;
+                }
             });
 
-            const worksheet = XLSX.utils.json_to_sheet(attendanceData);
+            const sortedDates = Array.from(dateSet).sort();
+            const header = ['Member', ...sortedDates.map(d => {
+                const dateObj = new Date(d);
+                const weekday = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
+                const dateLabel = dateObj.toLocaleDateString();
+                return `${weekday} ${dateLabel}`;
+            })];
+            const sheetRows = [header];
+
+            Array.from(rowsByMember.keys()).sort().forEach(memberKey => {
+                const rowObj = rowsByMember.get(memberKey);
+                const row = [memberKey];
+                sortedDates.forEach(d => {
+                    row.push(rowObj[d] || '');
+                });
+                sheetRows.push(row);
+            });
+
+            const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
-
-            XLSX.writeFile(workbook, `${sessionName}_Attendance.xlsx`);
+            XLSX.writeFile(workbook, `${sessionName}_Attendance_Matrix.xlsx`);
         } catch (error) {
             console.error('Error exporting attendance session:', error);
             alert('Failed to export attendance data');
@@ -207,6 +264,8 @@ function AdminReports() {
             alert('Failed to update status. Please try again.');
         }
     };
+
+    
 
     return (
         <div className="admin-reports-container">
@@ -276,7 +335,7 @@ function AdminReports() {
                         </div>
                     ))}
                 </div>
-            )};
+            )}
 
 
             {/* Session Reports Section */}
@@ -319,7 +378,10 @@ function AdminReports() {
                                     >
                                         View Data
                                     </button>
+                                    
                                 </div>
+
+                                
                             </div>
                         ))}
                     </div>

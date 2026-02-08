@@ -1,0 +1,11 @@
+.privacyHeader {
+    display: flex;
+    height: 350px;
+    background-color: rgb(39, 210, 253);
+    position: absolute;
+    width: 100%;
+}
+
+@media screen {
+    
+}

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -13,6 +13,10 @@ import SessionCheckin from './pages/SessionCheckin';
 import ParticipantScan from './components/ParticipantScan';
 import GateReport from './components/AdminReports';
 import About from './pages/About';
+import CookiePolicy from './pages/CookiePolicy';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import UserAgreement from './pages/UserAgreement';
+import DataRetentionPolicy from './pages/DataRetentionPolicy';
 
 const theme = createTheme({
   palette: {
@@ -35,8 +39,13 @@ function App() {
             <Route path="/scan-form/:qrId" element={<ScanForm />} />
             <Route path="/participant-scan" element={<ParticipantScan/>}/>
             <Route path="/session-checkin/:sessionId" element={<SessionCheckin/>}/>
+            <Route path="/cookie-policy" element={<CookiePolicy/>}/>
+            <Route path="/privacy-policy" element={<PrivacyPolicy/>}/>
+            <Route path="/user-agreement" element={<UserAgreement/>}/>
+            <Route path="/data-retention-policy" element={<DataRetentionPolicy/>}/>
             <Route path="/reports" element={<GateReport/>}/>
             <Route path="/about" element={<About/>}/>
+
             <Route 
               path="/member" 
               element={
