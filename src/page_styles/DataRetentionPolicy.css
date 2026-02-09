@@ -1,0 +1,163 @@
+/* Data Retention Policy Styles */
+.data-retention-main {
+  min-height: 100vh;
+  background: linear-gradient(120deg, #fbfaf9 0%, #0084f0 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 0 1rem;
+}
+
+.data-retention-header {
+  text-align: center;
+  margin-top: 2.5rem;
+  margin-bottom: 2rem;
+  max-width: 800px;
+}
+
+.data-retention-header h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #195d95;
+  margin-bottom: 1rem;
+  letter-spacing: 1px;
+}
+
+.data-retention-header p {
+  font-size: 1rem;
+  color: #1769aa;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.data-retention-content {
+  max-width: 800px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(33, 150, 243, 0.1);
+  padding: 2rem;
+  margin-bottom: 3rem;
+}
+
+.data-retention-content section {
+  margin-bottom: 2rem;
+}
+
+.data-retention-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1976d2;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #e3f2fd;
+  padding-bottom: 0.5rem;
+}
+
+.data-retention-content h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2196f3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.data-retention-content p {
+  color: #444;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.data-retention-content ul {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.data-retention-content li {
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+.data-retention-content strong {
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.data-retention-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  background: #f8f9fa;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.data-retention-content th,
+.data-retention-content td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.data-retention-content th {
+  background: #e3f2fd;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.data-retention-content tr:nth-child(even) {
+  background: #f8f9fa;
+}
+
+.data-retention-content tr:hover {
+  background: #e3f2fd;
+}
+
+@media (max-width: 900px) {
+  .data-retention-header h1 {
+    font-size: 2rem;
+  }
+
+  .data-retention-content {
+    padding: 1.5rem;
+  }
+
+  .data-retention-content h2 {
+    font-size: 1.3rem;
+  }
+
+  .data-retention-content h3 {
+    font-size: 1.1rem;
+  }
+
+  .data-retention-content table {
+    font-size: 0.9rem;
+  }
+
+  .data-retention-content th,
+  .data-retention-content td {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .data-retention-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .data-retention-content {
+    padding: 1rem;
+  }
+
+  .data-retention-content h2 {
+    font-size: 1.2rem;
+  }
+
+  .data-retention-content h3 {
+    font-size: 1rem;
+  }
+
+  .data-retention-content table {
+    font-size: 0.8rem;
+  }
+}

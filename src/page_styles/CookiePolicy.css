@@ -1,0 +1,120 @@
+/* Cookie Policy Styles */
+.cookie-policy-main {
+  min-height: 100vh;
+  background: linear-gradient(120deg, #fbfaf9 0%, #0084f0 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 0 1rem;
+}
+
+.cookie-policy-header {
+  text-align: center;
+  margin-top: 2.5rem;
+  margin-bottom: 2rem;
+  max-width: 800px;
+}
+
+.cookie-policy-header h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #195d95;
+  margin-bottom: 1rem;
+  letter-spacing: 1px;
+}
+
+.cookie-policy-header p {
+  font-size: 1rem;
+  color: #1769aa;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.cookie-policy-content {
+  max-width: 800px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(33, 150, 243, 0.1);
+  padding: 2rem;
+  margin-bottom: 3rem;
+}
+
+.cookie-policy-content section {
+  margin-bottom: 2rem;
+}
+
+.cookie-policy-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1976d2;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #e3f2fd;
+  padding-bottom: 0.5rem;
+}
+
+.cookie-policy-content h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2196f3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.cookie-policy-content p {
+  color: #444;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.cookie-policy-content ul {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.cookie-policy-content li {
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+.cookie-policy-content strong {
+  color: #1976d2;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .cookie-policy-header h1 {
+    font-size: 2rem;
+  }
+
+  .cookie-policy-content {
+    padding: 1.5rem;
+  }
+
+  .cookie-policy-content h2 {
+    font-size: 1.3rem;
+  }
+
+  .cookie-policy-content h3 {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .cookie-policy-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .cookie-policy-content {
+    padding: 1rem;
+  }
+
+  .cookie-policy-content h2 {
+    font-size: 1.2rem;
+  }
+
+  .cookie-policy-content h3 {
+    font-size: 1rem;
+  }
+}

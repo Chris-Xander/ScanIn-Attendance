@@ -892,6 +892,12 @@
     font-size: 0.85rem;
   }
 
+  .session-item {
+    padding: 1rem;
+    gap: 1.75rem;
+    margin-bottom: 20px;
+  }
+
   .session-actions {
     flex-direction: column;
   }
@@ -942,4 +948,15 @@
     margin-top: 5px;
     margin-bottom: -10px;
 }
+  .participant-item {
+    display: flex;
+    flex-direction: column;
+    max-width: 350px;
+  }
+  .participant-info strong {
+    text-align: center;
+  }
+  .participant-info span {
+    text-align: center;
+  }
 }

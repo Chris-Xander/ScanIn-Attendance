@@ -50,50 +50,43 @@ function AdminReports() {
                 return;
             }
 
-            // Build matrix: rows = respondent (memberId or anon id), cols = date
-            const rowsByMember = new Map();
-            const dateSet = new Set();
+            // Collect all unique form fields for header
+            const allFields = new Set();
+            snapshot.docs.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.formData) {
+                    Object.keys(data.formData).forEach(field => allFields.add(field));
+                }
+            });
 
+            // Build header: Timestamp, User, and form fields
+            const header = ['Timestamp', 'User', ...Array.from(allFields).sort()];
+
+            const sheetRows = [header];
+
+            // Populate rows
             snapshot.docs.forEach(docSnap => {
                 const data = docSnap.data();
                 const ts = data.timestamp || data.submittedAt || null;
                 const dateObj = ts && typeof ts.toDate === 'function' ? ts.toDate() : (ts ? new Date(ts) : new Date());
-                const dateKey = dateObj.toISOString().split('T')[0];
-                dateSet.add(dateKey);
+                const timestampStr = dateObj.toLocaleString(); // Neat timestamp
 
-                const memberKey = data.memberId || data.formData?.name || docSnap.id;
-                if (!rowsByMember.has(memberKey)) rowsByMember.set(memberKey, {});
+                const user = data.memberId || data.formData?.name || 'Anonymous';
 
-                // record presence/time
-                const timeStr = dateObj.toLocaleTimeString();
-                rowsByMember.get(memberKey)[dateKey] = timeStr;
-            });
+                const row = [timestampStr, user];
 
-            const sortedDates = Array.from(dateSet).sort();
-
-            // Build header
-            const header = ['Member', ...sortedDates.map(d => {
-                const dateObj = new Date(d);
-                const weekday = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
-                const dateLabel = dateObj.toLocaleDateString();
-                return `${weekday} ${dateLabel}`;
-            })];
-
-            const sheetRows = [header];
-            // Populate rows
-            Array.from(rowsByMember.keys()).sort().forEach(memberKey => {
-                const rowObj = rowsByMember.get(memberKey);
-                const row = [memberKey];
-                sortedDates.forEach(d => {
-                    row.push(rowObj[d] || '');
+                // Add form data values in order of header
+                Array.from(allFields).sort().forEach(field => {
+                    row.push(data.formData?.[field] || '');
                 });
+
                 sheetRows.push(row);
             });
 
             const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Responses");
-            XLSX.writeFile(workbook, `${qrName}_Responses_Matrix.xlsx`);
+            XLSX.writeFile(workbook, `${qrName}_Responses.xlsx`);
         } catch (err) {
             console.error("There was an error downloading the responses: ", err);
             alert("Failed to generate report.");

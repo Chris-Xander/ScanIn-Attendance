@@ -1,156 +1,151 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Enforce HTTPS for all requests
-    function isSecure() {
-      return request.scheme == 'https' || request.scheme == 'wss';
-    }
-
     // Allow users to read and write their own user data
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId && isSecure();
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
     // DEVICE TOKEN BASED ATTENDANCE SYSTEM
 
     // Members collection - pre-registered members via CSV
     match /members/{memberId} {
-      allow read: if request.auth != null && isSecure(); // Require auth for reads
-      allow write: if request.auth != null && request.auth.uid == resource.data.adminId && isSecure();
-      allow create: if request.auth != null && isSecure(); // Admin creates via CSV
+      allow read: if request.auth != null || true; // Public read for device registration
+      allow write: if request.auth != null && request.auth.uid == resource.data.adminId;
+      allow create: if request.auth != null; // Admin creates via CSV
     }
 
     // Sessions collection - multi-day sessions
     match /sessions/{sessionId} {
-      allow read: if request.auth != null && isSecure(); // Require auth
-      allow create: if request.auth != null && isSecure();
+      allow read: if true;
+      allow create: if request.auth != null;
       allow update: if request.auth != null && (
         resource.data.adminId == request.auth.uid
         || request.auth.token.admin == true
         || !("adminId" in resource.data)
-      ) && isSecure();
+      );
     }
 
     // Devices collection - device token to member mapping
     match /devices/{deviceId} {
-      allow read: if request.auth != null && isSecure(); // Require auth
-      allow write: if request.auth != null && isSecure(); // Require auth for writes
-      allow create: if request.auth != null && isSecure(); // Require auth
+      allow read: if request.auth != null || true; // Public read for device lookup
+      allow write: if true; // Clients create device tokens
+      allow create: if true; // Anyone can register a device
     }
 
     // Attendance Records - new collection for device-token based attendance
     match /attendanceRecords/{recordId} {
-      allow create: if request.auth != null && isSecure(); // Require auth
-      allow read: if request.auth != null && isSecure(); // Require auth
-      allow update, delete: if request.auth != null && isSecure(); // Admin control
+      allow create: if true; // Anyone can submit attendance
+      allow read: if true; // Public read for duplicate check during check-in
+      allow update, delete: if request.auth != null; // Admin control
     }
 
     // Allow admins to manage custom QR codes
     match /customQRCodes/{qrCodeId} {
-      allow read: if request.auth != null && isSecure(); // Require auth for reads
+      allow read: if true; // Allow public read for QR validation
       allow create: if request.auth != null &&
-        request.resource.data.adminId == request.auth.uid && isSecure();
+        request.resource.data.adminId == request.auth.uid;
       allow update: if request.auth != null && resource.data.adminId == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scanCount']) && isSecure();
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scanCount']);
       allow delete: if request.auth != null &&
-        resource.data.adminId == request.auth.uid && isSecure();
+        resource.data.adminId == request.auth.uid;
     }
 
-    // Allow public access to scan forms (for QR code validation) - kept minimal for functionality
+    // Allow public access to scan forms (for QR code validation)
     match /scanForms/{formId} {
-      allow read: if true && isSecure(); // Public but secure
-      allow write: if request.auth != null && isSecure();
+      allow read: if true; // Public read access for QR validation
+      allow write: if request.auth != null;
     }
 
     // Allow admins to manage attendance databases
     match /attendanceDatabases/{dbId} {
-      allow read, write: if request.auth != null && isSecure();
+      allow read, write: if request.auth != null;
     }
 
     // Allow admins to manage QR-Gate reports
     match /qrGateReports/{reportId} {
-      allow read: if request.auth != null && isSecure();
+      allow read: if request.auth != null;
       allow create: if request.auth != null &&
-        request.resource.data.adminId == request.auth.uid && isSecure();
+        request.resource.data.adminId == request.auth.uid;
       allow update, delete: if request.auth != null &&
-        resource.data.adminId == request.auth.uid && isSecure();
+        resource.data.adminId == request.auth.uid;
     }
 
     // Full form data (private)
     match /formSubmitData/{documentId} {
-      allow create: if request.auth != null && isSecure(); // Require auth
+      allow create: if true; // anyone can submit
       allow read: if request.auth != null && (
         resource.data.adminId == request.auth.uid
         || request.auth.token.admin == true // allow admin users with custom claim 'admin'
         || request.auth.uid == get(/databases/$(database)/documents/customQRCodes/$(resource.data.qrCodeId)).data.adminId // allow if user is the QR code creator
-      ) && isSecure(); // admin, owner, or QR code creator
-      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid && isSecure();
+      ); // admin, owner, or QR code creator
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid;
     }
 
     // Duplicate check collection (public read)
     match /formSubmitCheck/{documentId} {
-      allow create: if request.auth != null && isSecure(); // Require auth
-      allow read: if request.auth != null && isSecure(); // Require auth
-      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid && isSecure(); // admin control
+      allow create: if true; // anyone can add their device ID
+      allow read: if true; // anyone can check if their deviceId exists
+      allow update, delete: if request.auth != null && resource.data.adminId == request.auth.uid; // admin control
     }
 
     // Participants collection - session participants registered via CSV
     match /participants/{participantId} {
-      allow read: if request.auth != null && isSecure(); // Require auth
+      allow read: if true; // Public read for check-in validation
       // Allow creation when the authenticated user is the admin for the session or has an 'admin' custom claim
       allow create: if request.auth != null && (
         request.resource.data.adminId == request.auth.uid ||
         request.auth.token.admin == true
-      ) && isSecure();
+      );
       allow update, delete: if request.auth != null && (
         resource.data.adminId == request.auth.uid ||
         request.auth.token.admin == true
-      ) && isSecure();
+      );
     }
 
     // Member metadata - store raw CSV rows and extra fields for members
     match /memberMetadata/{metaId} {
-      allow read: if request.auth != null && resource.data.adminId == request.auth.uid && isSecure();
+      allow read: if request.auth != null && resource.data.adminId == request.auth.uid || false;
       allow create: if request.auth != null && (
         request.resource.data.adminId == request.auth.uid ||
         request.auth.token.admin == true
-      ) && isSecure();
+      );
       allow update, delete: if request.auth != null && (
-        request.resource.data.adminId == request.auth.uid ||
+        resource.data.adminId == request.auth.uid ||
         request.auth.token.admin == true
-      ) && isSecure();
+      );
     }
 
     // Session member metadata - store raw CSV rows and extra fields for participants per session
     match /sessionMemberData/{metaId} {
-      allow read: if request.auth != null && isSecure();
+      allow read: if request.auth != null;
       allow create: if request.auth != null && (
         request.resource.data.adminId == request.auth.uid ||
         request.auth.token.admin == true
-      ) && isSecure();
+      );
       allow update, delete: if request.auth != null && (
         resource.data.adminId == request.auth.uid ||
         request.auth.token.admin == true
-      ) && isSecure();
+      );
     }
 
     // Session device bindings - track device-user bindings per session
     match /sessionDeviceBindings/{bindingId} {
-      allow create: if request.auth != null && isSecure(); // Require auth
-      allow read: if request.auth != null && isSecure(); // Require auth
-      allow update: if request.auth != null && resource.data.adminId == request.auth.uid && isSecure();
-      allow delete: if request.auth != null && resource.data.adminId == request.auth.uid && isSecure();
+      allow create: if true; // Public creation for device binding
+      allow read: if true; // Public read for binding validation
+      allow update: if request.auth != null && resource.data.adminId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.adminId == request.auth.uid;
     }
 
     // Attendance logs - participants can create their own check-ins, public read for duplicate check, admins can update/delete
     match /attendanceLogs/{logId} {
-      allow create: if request.auth != null && isSecure(); // Require auth
-      allow read: if request.auth != null && isSecure(); // Require auth
-      allow update: if request.auth != null && resource.data.adminId == request.auth.uid && isSecure();
+      allow create: if true; // Public creation for check-in via QR codes
+      allow read: if true; // Public read for duplicate check during check-in
+      allow update: if request.auth != null && resource.data.adminId == request.auth.uid;
       allow delete: if request.auth != null && (
         resource.data.adminId == request.auth.uid ||
         !('adminId' in resource.data)  // Allow delete if adminId field doesn't exist (for migration)
-      ) && isSecure();
+      );
     }
 
     // Default deny all other access
