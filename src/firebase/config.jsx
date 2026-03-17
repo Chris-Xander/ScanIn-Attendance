@@ -23,7 +23,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 // Initialize Storage
 export const storage = getStorage(app);
-// Initialize Functions
-export const functions = getFunctions(app);
+// Initialize Functions with explicit region to match deployed function
+export const functions = getFunctions(app, 'us-central1');
 
 export default app;

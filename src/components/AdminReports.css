@@ -7,6 +7,14 @@
   border-radius: 25px;
 }
 
+.admin-reports-container h2 {
+    color: #0e4984;
+}
+
+.admin-reports-container p {
+    color: #123d6a;
+}
+
 /* QR Gate Reports List */
 .qr-gate-reports-list {
     margin-bottom: 30px;
@@ -31,6 +39,10 @@
     align-items: center;
     gap: 20px;
     max-width: 300px;
+}
+
+.qr-gate-report-item strong {
+    color: black;
 }
 
 .report-info {

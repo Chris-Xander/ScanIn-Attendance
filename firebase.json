@@ -24,9 +24,7 @@
   },
   "functions": [
     {
-      "source": "functions",
       "codebase": "default",
-      "runtime": "nodejs18",
       "disallowLegacyRuntimeConfig": true,
       "ignore": [
         "node_modules",
@@ -35,7 +33,9 @@
         "firebase-debug.*.log",
         "*.local"
       ],
-      "predeploy": []
+      "predeploy": [],
+      "source": "functions",
+      "runtime": "nodejs22"
     }
   ]
 }

@@ -285,6 +285,22 @@
   color: white;
 }
 
+.form-fields-list {
+  color: black;
+  padding: 10px;
+}
+
+.form-fields-list button {
+  margin-left: 20px;
+  background-color: #ccc;
+  color: red;
+  font-size: large;
+}
+
+.form-fields-list li{
+  margin-bottom: 15px;
+}
+
 /* QR Code Item Styles */
 .qr-code-item {
   background: white;

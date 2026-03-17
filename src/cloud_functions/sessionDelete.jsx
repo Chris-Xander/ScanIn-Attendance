@@ -3,13 +3,15 @@ import * as admin from 'firebase-admin';
 
 admin.initializeApp();
 
-//Cloud function for deleting sessions...
+// Cloud function for deleting sessions...
 export const deleteSession = functions.https.onCall(async (data, context) => {
-    //verify if user is authenticated
+    // Verify if user is authenticated
     if (!context.auth) {
+        // Use a valid canonical error code so the client
+        // receives a proper error instead of "internal"
         throw new functions.https.HttpsError(
-            'User Unauthenticated',
-            'Athentication required to delete sessions.'
+            'unauthenticated',
+            'Authentication required to delete sessions.'
         );
     }
 
@@ -28,10 +30,11 @@ export const deleteSession = functions.https.onCall(async (data, context) => {
         const sessionRef =  db.collection('sessions').doc(sessionId);
         const sessionDoc = await sessionRef.get();
 
-        //Check if session exists
+        // Check if session exists
         if (!sessionDoc.exists) {
             throw new functions.https.HttpsError(
-                'session not found',
+                // Use a valid canonical error code
+                'not-found',
                 'This Session does not exist'
             );
     }
@@ -40,8 +43,8 @@ export const deleteSession = functions.https.onCall(async (data, context) => {
     const userId = context.auth.uid;
     const userToken = context.auth.token;
 
-    //Check if user is admin or session owner and authorize deletion
-    const isOwner =sessionData?.adminI === userId;
+    // Check if user is admin or session owner and authorize deletion
+    const isOwner = sessionData?.adminId === userId;
     const isAdmin = userToken?.admin === true;
     const hasNoAdminId = !sessionData?.adminId;
 

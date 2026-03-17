@@ -18,6 +18,8 @@ function ScanForm() {
 	const [submitting, setSubmitting] = useState(false);
 	const [submitted, setSubmitted] = useState(false);
 	const [optimisticSubmitted, setOptimisticSubmitted] = useState(false);
+	const [showModal, setShowModal] = useState(false);
+	const [modalType, setModalType] = useState(null);
 
 	useEffect(() => {
 		async function fetchQRCodeData() {
@@ -36,6 +38,8 @@ function ScanForm() {
 
 				if (!qrCode) {
 					setError('QR code not found');
+					setModalType('error');
+					setShowModal(true);
 					setLoading(false);
 					return;
 				}
@@ -44,6 +48,8 @@ function ScanForm() {
 
 				if (!qrData.isActive) {
 					setError('This QR code is no longer active');
+					setModalType('error');
+					setShowModal(true);
 					setLoading(false);
 					return;
 				}
@@ -53,6 +59,8 @@ function ScanForm() {
 					const validFrom = new Date(qrData.validFrom);
 					if (now < validFrom) {
 						setError('This QR code is not yet valid');
+						setModalType('error');
+						setShowModal(true);
 						setLoading(false);
 						return;
 					}
@@ -61,6 +69,8 @@ function ScanForm() {
 					const validUntil = new Date(qrData.validUntil);
 					if (now > validUntil) {
 						setError('This QR code has expired');
+						setModalType('error');
+						setShowModal(true);
 						setLoading(false);
 						return;
 					}
@@ -86,6 +96,18 @@ function ScanForm() {
 
 		fetchQRCodeData();
 	}, [qrId]);
+
+	useEffect(() => {
+		// Show loading modal on initial load
+		if (loading && !error) {
+			setShowModal(true);
+			setModalType('loading');
+		} else if (!loading && !error) {
+			// Loading finished successfully, hide modal
+			setShowModal(false);
+			setModalType(null);
+		}
+	}, [loading, error]);
 
 	const handleFormChange = (e) => {
 		const { name, value } = e.target;
@@ -114,13 +136,21 @@ function ScanForm() {
 
 			// Parallel execution of device ID generation and duplicate check
 			const deviceId = await getDeviceId();
-			const duplicateCheckSnap = await getDoc(doc(db, 'formSubmitCheck', `${qrId}_${deviceId}`));
-
-			if (duplicateCheckSnap.exists()) {
-				setError('You cannot submit more than 1 response!');
-				setOptimisticSubmitted(false);
-				setSubmitting(false);
-				return;
+			
+			// Check if multiple submissions are allowed
+			const allowMultiple = qrCodeData.AllowMultipleSubmissions || false;
+			
+			// Only enforce duplicate check if multiple submissions are NOT allowed
+			if (!allowMultiple) {
+				const duplicateCheckSnap = await getDoc(doc(db, 'formSubmitCheck', `${qrId}_${deviceId}`));
+				if (duplicateCheckSnap.exists()) {
+					setError('You can only submit once for this QR code!');
+					setModalType('error');
+					setShowModal(true);
+					setOptimisticSubmitted(false);
+					setSubmitting(false);
+					return;
+				}
 			}
 
 			const batch = writeBatch(db);
@@ -151,8 +181,10 @@ function ScanForm() {
 					deviceId,
 					...(currentUser && { memberId: currentUser.uid })
 				});
+			}
 
-				// Add duplicate check
+			// Add duplicate check ONLY if multiple submissions are NOT allowed
+			if (!allowMultiple) {
 				const checkRef = doc(db, 'formSubmitCheck', `${qrId}_${deviceId}`);
 				batch.set(checkRef, {
 					qrCodeId: qrId,
@@ -170,27 +202,95 @@ function ScanForm() {
 
 			await batch.commit();
 			console.log('All operations completed successfully');
+			setModalType('success');
+			setShowModal(true);
 			setSubmitted(true);
 		} catch (err) {
 			console.error('Error submitting attendance:', err);
 			setError(`Failed to submit attendance: ${err.message || 'Please try again.'}`);
+			setModalType('error');
+			setShowModal(true);
 			setOptimisticSubmitted(false); // Revert on error
 		} finally {
 			setSubmitting(false);
 		}
 	};
 
-	if (loading) return <div className="scanform-bg"><h1>Loading...</h1></div>;
-	if (error) return <div className="scanform-bg"><h1>Error</h1><p>{error}</p></div>;
-	if (submitted || optimisticSubmitted) return <div className="scanform-bg"><h1>Attendance Recorded!</h1></div>;
+	// Modal overlay component
+	const FeedbackModal = () => {
+		if (!showModal) return null;
+
+		const handleModalClose = () => {
+			if (modalType === 'success') {
+				navigate('/');
+			} else {
+				setShowModal(false);
+				setModalType(null);
+				setError(null);
+				setOptimisticSubmitted(false);
+			}
+		};
+
+		const getModalContent = () => {
+			switch (modalType) {
+				case 'loading':
+					return {
+						title: 'Loading...',
+						message: 'Please wait while we process your request.',
+						icon: '⏳',
+						showButton: false
+					};
+				case 'error':
+					return {
+						title: 'Error',
+						message: error,
+						icon: '❌',
+						showButton: true,
+						buttonText: 'Try Again'
+					};
+				case 'success':
+					return {
+						title: 'Success!',
+						message: 'Attendance recorded successfully.',
+						icon: '✅',
+						showButton: true,
+						buttonText: 'Done'
+					};
+				default:
+					return { title: '', message: '', icon: '', showButton: false };
+			}
+		};
+
+		const content = getModalContent();
+
+		return (
+			<div className="scanform-modal-overlay">
+				<div className={`scanform-modal scanform-modal-${modalType}`}>
+					<div className="scanform-modal-icon">{content.icon}</div>
+					<h2 className="scanform-modal-title">{content.title}</h2>
+					<p className="scanform-modal-message">{content.message}</p>
+					{content.showButton && (
+						<button className="scanform-modal-button" onClick={handleModalClose}>
+							{content.buttonText}
+						</button>
+					)}
+					{!content.showButton && modalType === 'loading' && (
+						<div className="scanform-spinner"></div>
+					)}
+				</div>
+			</div>
+		);
+	};
 
 	return (
 		<div className="scanform-bg">
-			<div className="scanform-main">
-				<div className="scanform-container">
-					<div className="scanform-form-container">
-						<h1>{qrCodeData.name}</h1>
-						<p>{qrCodeData.description}</p>
+			<FeedbackModal />
+			{!loading && !error && (
+				<div className="scanform-main">
+					<div className="scanform-container">
+						<div className="scanform-form-container">
+							<h1>{qrCodeData?.name}</h1>
+							<p>{qrCodeData?.description}</p>
 
 						{qrCodeData.requiresForm ? (
 							<form onSubmit={handleSubmit} className="scanform-form">
@@ -260,6 +360,7 @@ function ScanForm() {
 					</div>
 				</div>
 			</div>
+			)}
 		</div>
 	);
 }

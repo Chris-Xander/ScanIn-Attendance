@@ -13,6 +13,13 @@ export default [
     },
   },
   {
+    files: ['attendance_functions/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: { ecmaVersion: 'latest' }
+    },
+  },
+  {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
       ecmaVersion: 2020,

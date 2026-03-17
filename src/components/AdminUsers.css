@@ -167,6 +167,10 @@
   border-radius: 15px;
 }
 
+.admin-db-session-form h3{
+  color: #10467c;
+}
+
 .admin-db-session-form form{
   background-color: white;
   padding: 10px;
@@ -192,6 +196,11 @@
   box-shadow: 0 2px 12px rgba(33, 150, 243, 0.08);
   border: 1.5px solid #e3e8ee;
   transition: all 0.3s ease;
+  color: black;
+}
+
+.admin-db-form-csv h3{
+  color: #145ca4;
 }
 
 .admin-db-form:hover {
@@ -320,6 +329,10 @@
   margin-top: 2.5rem;
   margin-bottom: 2rem;
   position: relative;
+}
+
+.members-list  h4 {
+  color: #10467c;
 }
 
 .members-list h3,
@@ -472,6 +485,8 @@
 
 .session-selection-item {
     padding: 15px;
+    color: #000000;
+    background-color: #bcdffb;
     border: 1px solid #ddd;
     border-radius: 8px;
     margin-bottom: 10px;
@@ -564,6 +579,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 2rem;
+  margin-top: 80px;
   border-bottom: 1px solid #e3e8ee;
   background: linear-gradient(135deg, #f8f9fa 0%, #f0f7ff 100%);
 }
@@ -600,6 +616,10 @@
 
 .qr-modal-body {
   padding: 2rem;
+}
+
+.qr-modal-body th, td {
+  color: #000000;
 }
 
 .qr-code-display {

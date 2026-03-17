@@ -235,7 +235,7 @@ function AdminReports() {
             alert('You do not have permission to delete this report.');
             return;
         }
-        if (window.confirm('Are you sure you want to delete this QR-Gate report?')) {
+        if (window.confirm('“Deleting this report will permanently remove the QR-Gate and stop any further responses. Are you sure?”')) {
             try {
                 await deleteDoc(doc(db, 'qrGateReports', reportId));
                 fetchQrGateReports(); // Refresh the list
@@ -245,20 +245,6 @@ function AdminReports() {
             }
         }
     };
-
-    const toggleActiveStatus = async (reportId, currentStatus) => {
-        try {
-            await updateDoc(doc(db, 'qrGateReports', reportId), {
-                isActive: !currentStatus
-            });
-            fetchQrGateReports(); // Refresh the list
-        } catch (error) {
-            console.error('Error updating QR-Gate report status:', error);
-            alert('Failed to update status. Please try again.');
-        }
-    };
-
-    
 
     return (
         <div className="admin-reports-container">
@@ -309,12 +295,6 @@ function AdminReports() {
                                     onClick={() => { setMatrixMode('qr'); setMatrixTargetId(report.qrCodeId); setShowMatrix(true); }}
                                 >
                                     View Data
-                                </button>
-                                <button
-                                    className="toggle-status-btn"
-                                    onClick={() => toggleActiveStatus(report.id, report.isActive)}
-                                >
-                                    {report.isActive ? 'Deactivate' : 'Activate'}
                                 </button>
                                 <button
                                     className="delete-btn"

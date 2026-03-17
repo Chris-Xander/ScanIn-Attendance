@@ -99,7 +99,12 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
             const rows = records.map(r => {
                 // Extract name: prioritize formData.name (from form submission), then memberName, then fallback
                 const displayName = 
-                    (r.formData && typeof r.formData === 'object' && r.formData.name) || 
+                    (r.formData && typeof r.formData === 'object' && (
+                    r.formData.name ||
+                    r.formData.Name ||
+                    r.formData["full name"] ||
+                    r.formData["Full Name"]
+                    )) || 
                     r.memberName || 
                     r.deviceToken || 
                     'Unknown';
@@ -166,7 +171,7 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                                             <th key={d}>{formatDateWithDay(d)}</th>
                                         ))}
                                     </tr>
-                                </thead>
+                                </thead>;
                                 <tbody>
                                     {matrix.map((row, idx) => (
                                         <tr key={row.id}>

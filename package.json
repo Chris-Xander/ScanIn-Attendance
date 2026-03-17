@@ -16,6 +16,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/material": "^7.1.1",
+    "cors": "^2.8.6",
     "firebase": "^11.9.0",
     "gapi-script": "^1.2.0",
     "html5-qrcode": "^2.3.8",

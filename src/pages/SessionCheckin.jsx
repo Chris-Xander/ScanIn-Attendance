@@ -171,12 +171,12 @@ function SessionCheckin() {
                 const now = new Date();
                 const hoursSinceLastCheckin = (now - lastCheckinTime) / (1000 * 60 * 60);
 
-                if (hoursSinceLastCheckin < 24) {
-                    const remainingHours = Math.ceil(24 - hoursSinceLastCheckin);
-                    setMessage(`Looks like you've already been checked in. To checkin again wait ${remainingHours} hours`);
-                    setCheckingIn(false);
-                    return;
-                }
+              //  if (hoursSinceLastCheckin < 24) {
+              //      const remainingHours = Math.ceil(24 - hoursSinceLastCheckin);
+              //      setMessage(`Looks like you've already been checked in. To checkin again wait ${remainingHours} hours`);
+              //      setCheckingIn(false);
+              //      return;
+              //  }
             }
 
             // Create attendance record (centralized: enforces geofence when configured)

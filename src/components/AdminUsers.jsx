@@ -20,13 +20,73 @@ function AdminUsers() {
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const batch = writeBatch(db);
 
+
+    const NAME_FIELDS = [
+        "name",
+        "full name",
+        "fullname",
+        "participant name",
+        "member name",
+        "membername",
+        "username"
+    ];
+
+    const EMAIL_FIELDS = [
+        "email",
+        "email address",
+        "emailaddress",
+        "participant email",
+        "member email",
+        "memberemail",
+        "user email",
+        "student email",
+        "work email"
+    ];
+
+    const PHONE_FIELDS = [
+        "phone",
+        "phone number",
+        "phonenumber",
+        "participant phone",
+        "member phone",
+        "memberphone",
+        "user phone",
+        "contact",
+        "contacts",
+        "contact number",
+        "contactnumber"
+    ]
+
     // Create a deterministic identity key from name + email + contact
     const createIdentityKey = (name, email, contact) => {
         const n = (name || '').trim().toLowerCase();
         const e = (email || '').trim().toLowerCase();
-        const c = (contact || '').replace(/\D/g, '');
-        return `${n}|${e}|${c}`;
+        const p = (contact || '').replace(/\D/g, '');
+
+        if (e) {
+            return `${n}|${e}`;
+        }
+
+        if (p) {
+            return `${n}|${p}`;
+        }
+
+        return null; // No valid identifier available
     };
+
+    const findColumnValue = (row, allowedFields) => {
+        const keys = Object.keys(row);
+
+        for (const key of keys) {
+            const normalizedKey = key.trim().toLowerCase().replace(/[^\w\s]/g, '') .replace(/\s+/g, ' ');;
+
+            if (allowedFields.includes(normalizedKey)) {
+                return row[key];
+            }
+        }
+
+        return '';
+    }
 
 
     // Session form state
@@ -57,7 +117,7 @@ function AdminUsers() {
     // Delete confirmation modal state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [sessionToDelete, setSessionToDelete] = useState(null);
-    const [expandedSessions, setExpandedSessions] = useState({});
+    // const [expandedSessions, setExpandedSessions] = useState({}); // REMOVED
     const [sessionParticipants, setSessionParticipants] = useState({});
     const [allSessionParticipants, setAllSessionParticipants] = useState({});
     const [allSessions, setAllSessions] = useState([]);
@@ -65,6 +125,9 @@ function AdminUsers() {
     const [editFormData, setEditFormData] = useState({ email: '', phone: '' });
     const [showRemoveModal, setShowRemoveModal] = useState(false);
     const [participantToRemove, setParticipantToRemove] = useState(null);
+    // NEW: Participants table modal state
+    const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+    const [selectedSessionForModal, setSelectedSessionForModal] = useState(null);
 
     useEffect(() => {
         if (activeTab === 'members') {
@@ -131,37 +194,13 @@ function AdminUsers() {
             return unsubscribe;
         } catch (error) {
             console.error('Error fetching attendance logs:', error);
-        }
-    };
-
-    const fetchSessionAttendance = async () => {
-        try {
-            const logsRef = collection(db, 'attendanceRecords');
-            const q = query(logsRef, where('adminId', '==', currentUser.uid));
-            const snapshot = await getDocs(q);
-            const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-            // Group logs by sessionId
-            const grouped = logsData.reduce((acc, log) => {
-                if (!acc[log.sessionId]) {
-                    acc[log.sessionId] = [];
-                }
-                acc[log.sessionId].push(log);
-                return acc;
-            }, {});
-
-            setSessionAttendance(grouped);
-        } catch (error) {
-            console.error('Error fetching session attendance:', error);
-        }
-    };
+        }   };
 
     const handleSessionSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);  
         try {
             const sessionId = `ses_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
             // Generate QR code value with session ID
             const qrCodeValue = `${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${sessionId}`;
             
@@ -171,6 +210,7 @@ function AdminUsers() {
                 sessionId, 
                 qrCodeValue,
                 createdAt: new Date(),
+
                 isActive: true,
                 attendanceCount: 0,
                 geofence: {
@@ -223,100 +263,17 @@ function AdminUsers() {
         }
     };
 
-    const handleCsvSubmit = async () => {
-        if (!csvData.length) {
-            alert('Please upload a CSV file first');
-            return;
-        }
+    const handleDefaultClick = () => {
+        const location = getLocation();
 
-        setLoading(true);
-        try {
-            const membersRef = collection(db, 'members');
-            const memberMetaRef = collection(db, 'memberMetadata');
-            // Fetch existing members for this admin to prevent duplicates
-            const existingMembersSnapshot = await getDocs(query(membersRef, where('adminId', '==', currentUser.uid)));
-            const existingUniqueIds = new Set(existingMembersSnapshot.docs.map(d => d.data()?.uniqueIdentifier).filter(Boolean));
-            const batch = [];
-            const errors = [];
-            const uniqueIdentifiers = new Set();
-            let registeredCount = 0;
-
-            for (let i = 0; i < csvData.length; i++) {
-                const row = csvData[i];
-                const name = row.name || row.Name;
-                const email = row.email || row.Email || '';
-                const phone = row.phone || row.Phone || row.contact || row.Contact || '';
-
-                if (!name || (!email && !phone)) {
-                    errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${(!email && !phone) ? 'missing' : 'present'}`);
-                    continue;
-                }
-
-                const normalizedPhone = (phone || '').toString();
-                const uniqueId = createIdentityKey(name, email, normalizedPhone);
-                if (uniqueIdentifiers.has(uniqueId)) {
-                    errors.push(`Row ${i + 1}: Duplicate identifier for '${name}'`);
-                    continue;
-                }
-                // Skip if already exists in DB
-                if (existingUniqueIds.has(uniqueId)) {
-                    errors.push(`Row ${i + 1}: Member already exists for '${name}'`);
-                    continue;
-                }
-                uniqueIdentifiers.add(uniqueId);
-
-                const memberData = {
-                    adminId: currentUser.uid,
-                    name,
-                    email: (email || '').toLowerCase(),
-                    phone: phone,
-                    uniqueIdentifier: uniqueId,
-                    createdAt: new Date(),
-                    memberID: `mem_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
-                };
-
-                // Store member record and a separate metadata doc for other fields
-                batch.push(addDoc(membersRef, memberData));
-                // Mark as existing to avoid duplicates within this upload
-                existingUniqueIds.add(uniqueId);
-                const meta = {
-                    adminId: currentUser.uid,
-                    uniqueIdentifier: uniqueId,
-                    name,
-                    email: (email || '').toLowerCase(),
-                    phone: phone,
-                    rawRow: row,
-                    createdAt: new Date()
-                };
-                batch.push(addDoc(memberMetaRef, meta));
-                registeredCount += 1;
+        setSessionForm(prev => ({
+            ...prev,
+            geofence: {
+                ...prev.geofence,
+                location,
+                radius: 100 // default radius in meters
             }
-
-            if (errors.length > 0) {
-                setCsvValidationErrors(errors);
-                alert(`Validation errors found:\n${errors.join('\n')}\n\nOnly valid members will be registered.`);
-            }
-
-            if (registeredCount > 0) {
-                await Promise.all(batch);
-                alert(`Successfully registered ${registeredCount} members!`);
-                fetchMembers();
-            } else {
-                alert('No valid members to register.');
-            }
-            setCsvData([]);
-            setCsvFile(null);
-            setCsvValidationErrors([]);
-        } catch (error) {
-            console.error('Error registering members:', error);
-            alert('Failed to register members');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const generateUniqueCode = () => {
-        return Math.random().toString(36).substr(2, 9).toUpperCase();
+        }));
     };
 
     const exportSessionAttendance = async (sessionId, sessionName) => {
@@ -439,35 +396,24 @@ function AdminUsers() {
         }
     };
 
-    const fetchSessionParticipants = async (sessionId) => {
-        try {
-            const participantsRef = collection(db, 'participants');
-            const participantsQuery = query(participantsRef, where('sessionId', '==', sessionId));
-            const snapshot = await getDocs(participantsQuery);
+    
 
-            const participants = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-
-            setSessionParticipants(prev => ({
-                ...prev,
-                [sessionId]: participants
-            }));
-
-            return participants;
-        } catch (error) {
-            console.error('Error fetching session participants:', error);
-            return [];
-        }
+    // REMOVED: toggleSessionExpansion - replaced with modal
+    const openParticipantsModal = (session) => {
+        setSelectedSessionForModal(session);
+        setShowParticipantsModal(true);
+    };
+    const closeParticipantsModal = () => {
+        setShowParticipantsModal(false);
+        setSelectedSessionForModal(null);
     };
 
-    const toggleSessionExpansion = (sessionId) => {
-        setExpandedSessions(prev => ({
-            ...prev,
-            [sessionId]: !prev[sessionId]
-        }));
-    };
+    // REMOVED: unused standalone updateIdentifier - now computed inline in handleEditParticipant
+    // const updateIdentifier = createIdentityKey(
+    //     participant.name,
+    //     editFormData.email,
+    //     editFormData.phone
+    // )
 
     const handleEditParticipant = async (participantId) => {
         if (!editFormData.email && !editFormData.phone) {
@@ -479,7 +425,12 @@ function AdminUsers() {
         try {
             await updateDoc(doc(db, 'participants', participantId), {
                 email: editFormData.email.toLowerCase(),
-                phone: editFormData.phone
+                phone: editFormData.phone,
+                uniqueIdentifier: createIdentityKey(
+                    participant.name,
+                    editFormData.email.toLowerCase(),
+                    editFormData.phone.replace(/\D/g, '')
+                )
             });
 
             // Update the local state
@@ -571,7 +522,7 @@ function AdminUsers() {
             <div className="admin-db-form-container">
                 <div className="admin-db-form-csv">
                     <h3>Register Members via CSV</h3> 
-                    <p>Upload a CSV file with columns: <strong>Name, Email & Phone,</strong> then select Session to register members <strong>(required)</strong></p>
+                    <p>Upload a CSV file with columns: <strong>Name, Email & Phone,</strong> and other desired data, then select a Session to register members <strong>(required)</strong></p>
         
                     <input
                         type="file"
@@ -699,91 +650,14 @@ function AdminUsers() {
                                                     )}
                                                 </div>
                                             </div>
-                                            {sessionParticipants.length > 1 && (
-                                                <>
-                                                    {!expandedSessions[session.id] ? (
-                                                        <div className="view-more" onClick={() => toggleSessionExpansion(session.id)} style={{cursor: 'pointer', color: '#007bff', textDecoration: 'underline'}}>
-                                                            View {sessionParticipants.length - 1} more participant{sessionParticipants.length - 1 > 1 ? 's' : ''}...
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            {sessionParticipants.slice(1).map(participant => (
-                                                                <div key={participant.id} className="participant-item">
-                                                                    <div className="participant-info">
-                                                                        <strong>{participant.name}</strong>
-                                                                        {editingParticipantId === participant.id ? (
-                                                                            <>
-                                                                                <input
-                                                                                    type="email"
-                                                                                    placeholder="Email"
-                                                                                    value={editFormData.email}
-                                                                                    onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
-                                                                                    style={{marginRight: '10px', padding: '2px 4px'}}
-                                                                                />
-                                                                                <input
-                                                                                    type="text"
-                                                                                    placeholder="Phone"
-                                                                                    value={editFormData.phone}
-                                                                                    onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
-                                                                                    style={{marginRight: '10px', padding: '2px 4px'}}
-                                                                                />
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <span>{participant.email}</span>
-                                                                                {participant.phone && <span>Phone: {participant.phone}</span>}
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="participant-status">
-                                                                        <span style={{ color: '#4caf50', fontWeight: 'bold' }}>✓ Registered</span>
-                                                                    </div>
-                                                                    <div className="participant-actions">
-                                                                        {editingParticipantId === participant.id ? (
-                                                                            <>
-                                                                                <button
-                                                                                    onClick={() => handleEditParticipant(participant.id)}
-                                                                                    className="admin-db-open-btn"
-                                                                                    style={{fontSize: '12px', padding: '4px 8px', marginRight: '5px'}}
-                                                                                    disabled={loading}
-                                                                                >
-                                                                                    {loading ? 'Saving...' : 'Save'}
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={cancelEditing}
-                                                                                    className="admin-db-delete-btn"
-                                                                                    style={{fontSize: '12px', padding: '4px 8px', marginRight: '5px'}}
-                                                                                >
-                                                                                    Cancel
-                                                                                </button>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <button
-                                                                                    onClick={() => startEditing(participant)}
-                                                                                    className="admin-db-open-btn"
-                                                                                    style={{fontSize: '12px', padding: '4px 8px', marginRight: '5px'}}
-                                                                                >
-                                                                                    Edit
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => openRemoveModal(participant)}
-                                                                                    className="admin-db-delete-btn"
-                                                                                    style={{fontSize: '12px', padding: '4px 8px'}}
-                                                                                >
-                                                                                    Remove
-                                                                                </button>
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                            <div className="view-less" onClick={() => toggleSessionExpansion(session.id)} style={{cursor: 'pointer', color: '#007bff', textDecoration: 'underline'}}>
-                                                                View less
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </>
+                                             {sessionParticipants.length > 1 && (
+                                                <button 
+                                                    className="admin-db-open-btn" 
+                                                    style={{width: '100%', marginTop: '10px'}}
+                                                    onClick={() => openParticipantsModal(session)}
+                                                >
+                                                    View All {sessionParticipants.length} Participants in Table
+                                                </button>
                                             )}
                                         </>
                                     )}
@@ -865,8 +739,8 @@ function AdminUsers() {
                             onChange={(e) => setSessionForm({...sessionForm, maxParticipants: e.target.value})}
                         />
                       <div>
-                        <label style={{marginTop: '1.5rem', fontWeight: 'bold', color: '#f44336'}}>Geofence Settings (Optional)</label> <button type="button" className='geofence-default-button' onClick={getLocation}>Default</button>
-                        <p>: Default automatically selects your location</p>
+                        <label style={{marginTop: '1.5rem', fontWeight: 'bold', color: '#f44336'}}>Geofence Settings (Optional)</label> <button type="button" className='geofence-default-button' onClick={handleDefaultClick}>Default</button>
+                        <p>: Default automatically selects your location.</p>
                         
                         <div style={{display: 'grid', gap: '10px'}}>
                             <div style={{flex: 1}}>
@@ -969,7 +843,21 @@ function AdminUsers() {
         </>
     );
 
-            const handleCsvSubmitForSession = async (sessionId) => {
+    // ========================================================
+    // MEMBER PROFILE REGISTRATION TO SESSION LOGIC
+    // 
+    // This function registers member profiles (from CSV upload) 
+    // to a specific session by:
+    // 1. Validating each CSV row for required fields
+    // 2. Creating unique identifiers 
+    // 3. Checking for session-specific duplicates in 'participants'
+    // 4. Batch adding to 'participants' collection (sessionId-linked)
+    // 5. Adding metadata to 'sessionMemberData'
+    // 
+    // Called from session selection modal after CSV upload
+    // ========================================================
+    
+    const handleCsvSubmitForSession = async (sessionId) => {
             if (!csvData.length) {
                 alert('Please upload a CSV file first');
                 return;
@@ -989,16 +877,16 @@ function AdminUsers() {
 
                 for (let i = 0; i < csvData.length; i++) {
                     const row = csvData[i];
-                    const name = row.name || row.Name;
-                    const email = row.email || row.Email || '';
-                    const phone = row.phone || row.Phone || row.contact || row.Contact || '';
+                    const name = findColumnValue(row, NAME_FIELDS)
+                    const email = findColumnValue(row, EMAIL_FIELDS)
+                    const phone = findColumnValue(row, PHONE_FIELDS)
 
                     if (!name || (!email && !phone)) {
                         errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${(!email && !phone) ? 'missing' : 'present'}`);
                         continue;
                     }
 
-                    const normalizedPhone = (phone || '').toString();
+                    const normalizedPhone = (phone || '').replace(/\D/g, '');
                     const uniqueId = createIdentityKey(name, email, normalizedPhone);
                     if (uniqueIdentifiers.has(uniqueId)) {
                         errors.push(`Row ${i + 1}: Duplicate identifier for '${name}'`);
@@ -1090,6 +978,100 @@ function AdminUsers() {
         </>
     );
 
+    const renderParticipantsTableModal = () => {
+        if (!selectedSessionForModal || !showParticipantsModal) return null;
+
+        const sessionParticipants = allSessionParticipants[selectedSessionForModal.id] || [];
+
+        return (
+            <div className="qr-modal-overlay" onClick={closeParticipantsModal}>
+                <div className="qr-modal-content" style={{maxWidth: '95vw', maxHeight: '90vh', width: '1200px'}} onClick={(e) => e.stopPropagation()}>
+                    <div className="qr-modal-header">
+                        <h2>{selectedSessionForModal.name} - All Participants ({sessionParticipants.length})</h2>
+                        <button className="qr-modal-close" onClick={closeParticipantsModal}>×</button>
+                    </div>
+                    <div className="qr-modal-body" style={{overflow: 'auto'}}>
+                        <div style={{overflowX: 'auto'}}>
+                            <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
+                                <thead>
+                                    <tr style={{backgroundColor: '#f5f5f5'}}>
+                                        <th style={{padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold'}}>Name</th>
+                                        <th style={{padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold'}}>Email</th>
+                                       <th style={{padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold'}}>Phone</th>
+                                        <th style={{padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid #ddd', fontWeight: 'bold', minWidth: '150px'}}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sessionParticipants.map(participant => (
+                                        <tr key={participant.id} style={{borderBottom: '1px solid #eee'}}>
+                                            <td style={{padding: '12px 8px', fontWeight: '500'}}>{participant.name}</td>
+                                            <td style={{padding: '12px 8px'}}>{editingParticipantId === participant.id ? (
+                                                <input
+                                                    type="email"
+                                                    value={editFormData.email}
+                                                    onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                                                    style={{width: '100%', padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px'}}
+                                                    placeholder="Email"
+                                                />
+                                            ) : participant.email || '—'}</td>
+                                            <td style={{padding: '12px 8px'}}>{editingParticipantId === participant.id ? (
+                                                <input
+                                                    type="text"
+                                                    value={editFormData.phone}
+                                                    onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+                                                    style={{width: '100%', padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px'}}
+                                                    placeholder="Phone"
+                                                />
+                                            ) : participant.phone || '—'}</td>
+                                            <td style={{padding: '12px 8px', textAlign: 'center'}}>
+                                                {editingParticipantId === participant.id ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleEditParticipant(participant.id)}
+                                                            className="admin-db-open-btn"
+                                                            style={{fontSize: '12px', padding: '6px 12px', marginRight: '6px', minWidth: '60px'}}
+                                                            disabled={loading}
+                                                        >
+                                                            {loading ? 'Saving...' : 'Save'}
+                                                        </button>
+                                                        <button
+                                                            onClick={cancelEditing}
+                                                            className="admin-db-delete-btn"
+                                                            style={{fontSize: '12px', padding: '6px 12px', minWidth: '60px'}}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => startEditing(participant)}
+                                                            className="admin-db-open-btn"
+                                                            style={{fontSize: '12px', padding: '6px 12px', marginRight: '6px', minWidth: '50px'}}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => openRemoveModal(participant)}
+                                                            className="admin-db-delete-btn"
+                                                            style={{fontSize: '12px', padding: '6px 12px', minWidth: '60px'}}
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div>
             {/* Tab Navigation */}
@@ -1118,8 +1100,11 @@ function AdminUsers() {
             <div className="tab-content">
                 {activeTab === 'members' && renderMemberManagement()}
                 {activeTab === 'sessions' && renderSessionManagement()}
-                {activeTab === 'dashboard' && renderSessionDashboard()}
+            {activeTab === 'dashboard' && renderSessionDashboard()}
             </div>
+
+            {/* NEW Participants Table Modal */}
+            {renderParticipantsTableModal()}
 
             {/* QR Code Modal */}
             {showQRModal && selectedSession && (

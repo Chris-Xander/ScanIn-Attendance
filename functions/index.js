@@ -1,12 +1,21 @@
 /* eslint-env node */
-const { setGlobalOptions } = require('firebase-functions');
-const { onCall } = require('firebase-functions/v2/https');
+const { setGlobalOptions } = require('firebase-functions/v2');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
-setGlobalOptions({ maxInstances: 10 });
+setGlobalOptions({ maxInstances: 10, region: 'us-central1' });
+
+// Allowed origins for CORS (use HTTP endpoint from client)
+const CORS_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://chris-xander.github.io',
+  'https://attendance-app-3efdc.web.app',
+  'https://attendance-app-3efdc.firebaseapp.com',
+];
 
 const BATCH_SIZE = 500; // Firestore batch limit
 
@@ -61,59 +70,114 @@ async function enqueueDeletionJob(db, sessionId, requestedBy, totalCount) {
   return jobRef.id;
 }
 
-exports.deleteSession = onCall(async (req) => {
-  try {
-    const { data, auth } = req;
-    if (!auth || !auth.uid) {
-      logger.warn('deleteSession call without auth');
-      throw new Error('unauthenticated');
+function setCors(res, origin) {
+  const allowOrigin = origin && CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
+  res.set('Access-Control-Allow-Origin', allowOrigin);
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Max-Age', '86400');
+}
+
+function sendError(res, origin, code, message, status = 400) {
+  setCors(res, origin);
+  res.status(status).json({ error: { code, message } });
+}
+
+exports.deleteSessionHttp = onRequest(
+  { region: 'us-central1', cors: CORS_ORIGINS },
+  async (req, res) => {
+    let origin = req.get('Origin');
+    if (!origin && req.get('Referer')) {
+      try { origin = new URL(req.get('Referer')).origin; } catch (_) {}
     }
-    const uid = auth.uid;
-    const sessionId = data && data.sessionId;
-    if (!sessionId || typeof sessionId !== 'string') {
-      throw new Error('sessionId required');
-    }
+    setCors(res, origin);
 
-    const db = admin.firestore();
-    const sessDoc = await db.collection('sessions').doc(sessionId).get();
-    if (!sessDoc.exists) throw new Error('session-not-found');
-    const sess = sessDoc.data();
-
-    const isOwner = sess.adminId === uid;
-    const isGlobalAdmin = !!(auth.token && auth.token.admin);
-    if (!isOwner && !isGlobalAdmin) {
-      throw new Error('not-authorized');
-    }
-
-    const totalToDelete = await countSessionDocs(db, sessionId);
-    logger.info(`deleteSession: session ${sessionId} total related docs=${totalToDelete}`, { sessionId, totalToDelete });
-
-    if (totalToDelete <= BATCH_SIZE) {
-      const deleted = await deleteAllDocsForSession(db, sessionId);
-      logger.info(`deleteSession synchronous deleted ${deleted} docs for session ${sessionId}`);
-      return { success: true, mode: 'synchronous', deleted };
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
     }
 
-    const jobId = await enqueueDeletionJob(db, sessionId, uid, totalToDelete);
-    logger.info(`deleteSession enqueued job ${jobId} for session ${sessionId}`);
-    return { jobId, status: 'queued' };
-  } catch (err) {
-    logger.error('deleteSession error', err);
-    // Convert to generic error messages for clients
-    const map = {
-      'unauthenticated': { code: 'unauthenticated', message: 'Authentication required' },
-      'session-not-found': { code: 'not-found', message: 'Session not found' },
-      'not-authorized': { code: 'permission-denied', message: 'Not authorized to delete this session' },
-    };
-    if (map[err.message]) {
-      throw new Error(JSON.stringify(map[err.message]));
+    if (req.method !== 'POST') {
+      sendError(res, origin, 'invalid-argument', 'Method not allowed', 405);
+      return;
     }
-    throw new Error(JSON.stringify({ code: 'internal', message: 'Server error' }));
+
+    try {
+      const authHeader = req.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        sendError(res, origin, 'unauthenticated', 'Authentication required.', 401);
+        return;
+      }
+      const idToken = authHeader.split('Bearer ')[1];
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      const uid = decoded.uid;
+      const customClaims = decoded;
+
+      const body = typeof req.body === 'object' ? req.body : {};
+      const sessionId = body.sessionId;
+
+      if (!sessionId || typeof sessionId !== 'string') {
+        sendError(res, origin, 'invalid-argument', 'A valid sessionId must be provided.', 400);
+        return;
+      }
+
+      const db = admin.firestore();
+      const sessDoc = await db.collection('sessions').doc(sessionId).get();
+
+      if (!sessDoc.exists) {
+        sendError(res, origin, 'not-found', 'Session not found.', 404);
+        return;
+      }
+
+      const sess = sessDoc.data();
+      const isOwner = sess.adminId === uid;
+      const isGlobalAdmin = !!(customClaims.admin === true);
+      if (!isOwner && !isGlobalAdmin) {
+        sendError(res, origin, 'permission-denied', 'Not authorized to delete this session.', 403);
+        return;
+      }
+
+      const totalToDelete = await countSessionDocs(db, sessionId);
+      logger.info(
+        `deleteSession: session ${sessionId} total related docs=${totalToDelete}`,
+        { sessionId, totalToDelete }
+      );
+
+      if (totalToDelete <= BATCH_SIZE) {
+        const deleted = await deleteAllDocsForSession(db, sessionId);
+        logger.info(`deleteSession synchronous deleted ${deleted} docs for session ${sessionId}`);
+        res.status(200).json({
+          result: {
+            success: true,
+            mode: 'synchronous',
+            deleted,
+            message: `Session and ${deleted} related record(s) deleted successfully.`,
+          },
+        });
+        return;
+      }
+
+      const jobId = await enqueueDeletionJob(db, sessionId, uid, totalToDelete);
+      logger.info(`deleteSession enqueued job ${jobId} for session ${sessionId}`);
+      res.status(200).json({
+        result: { jobId, status: 'queued', message: 'Deletion queued for large session.' },
+      });
+    } catch (err) {
+      logger.error('deleteSession error', err);
+      if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error') {
+        sendError(res, origin, 'unauthenticated', 'Invalid or expired token.', 401);
+        return;
+      }
+      setCors(res, origin);
+      res.status(500).json({ error: { code: 'internal', message: 'Server error while deleting session.' } });
+    }
   }
-});
+);
 
 // Worker: process deletion jobs
-exports.processDeletionJob = onDocumentCreated('deletionJobs/{jobId}', async (event) => {
+exports.processDeletionJob = onDocumentCreated(
+  { document: 'deletionJobs/{jobId}', region: 'us-central1' },
+  async (event) => {
   const jobId = event.params.jobId;
   const jobData = event.data;
   logger.info('processDeletionJob started', { jobId, jobData });
@@ -159,4 +223,5 @@ exports.processDeletionJob = onDocumentCreated('deletionJobs/{jobId}', async (ev
     await jobRef.update({ status: 'failed', error: err.message, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
     return null;
   }
-});
+  }
+);
