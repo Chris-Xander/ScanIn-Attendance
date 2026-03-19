@@ -1,9 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebase/config';
-import { collection, doc, getDoc, query, where, getDocs, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, getDocs, setDoc, writeBatch } from 'firebase/firestore';
 import { submitAttendance } from '../utility/attendanceManager';
+import { parsePhoneNumber } from 'libphonenumber-js';
 import './SessionCheckin.css';
+
+const normalizePhone = (phone) => {
+    if (!phone) return '';
+    try {
+        const phoneNumber = parsePhoneNumber(phone, 'US');
+        if (phoneNumber.isValid()) {
+            return phoneNumber.format('E164');
+        } else {
+            return phone.replace(/\D/g, '');
+        }
+    } catch {
+        return phone.replace(/\D/g, '');
+    }
+};
 
 function SessionCheckin() {
     const { sessionId } = useParams();
@@ -22,6 +37,21 @@ function SessionCheckin() {
     const [checkingRegistration, setCheckingRegistration] = useState(false);
     const [deviceRecognized, setDeviceRecognized] = useState(false);
     const [recognizedEmail, setRecognizedEmail] = useState('');
+    const createIdentityKey = (name, email, contact) => {
+        const n = (name || '').trim().toLowerCase();
+        const e = (email || '').trim().toLowerCase();
+        const p = (contact || '').replace(/\D/g, '');
+
+        if (e) {
+            return `${n}|${e}`;
+        }
+
+        if (p) {
+            return `${n}|${p}`;
+        }
+
+        return null; // No valid identifier available
+    };
 
     useEffect(() => {
         fetchSession();
@@ -90,6 +120,8 @@ function SessionCheckin() {
         setCheckingIn(true);
         setMessage('');
 
+        const normalizedPhone = normalizePhone(checkinForm.phone);
+
         try {
             // Check if session has expired
             const now = new Date();
@@ -100,86 +132,65 @@ function SessionCheckin() {
                 return;
             }
 
-            // Get device ID
+            // Get device ID and create unique identifier
             const deviceId = getCookie('scanin_device_id') || generateDeviceId();
             const userEmail = checkinForm.email.toLowerCase();
-            const fingerprint = generateFingerprint();
+            const uniqueId = createIdentityKey(checkinForm.name, userEmail, normalizedPhone);
 
-            // Check if any device with the same fingerprint has already checked in for this session
-            const devicesQuery = query(
-                collection(db, 'devices'),
-                where('fingerprint', '==', fingerprint)
-            );
-            const devicesSnapshot = await getDocs(devicesQuery);
-
-            for (const deviceDoc of devicesSnapshot.docs) {
-                const deviceIdToCheck = deviceDoc.id;
-                const bindingQuery = query(
-                    collection(db, 'sessionDeviceBindings'),
-                    where('sessionId', '==', sessionId),
-                    where('deviceId', '==', deviceIdToCheck)
-                );
-                const bindingSnapshot = await getDocs(bindingQuery);
-                if (!bindingSnapshot.empty) {
-                    setMessage(`This device has already been used to check in for this session. Please use a different device or contact the organizer.`);
-                    setCheckingIn(false);
-                    return;
-                }
-            }
-
-            // Check device binding for this session (additional check with current device ID)
-            const bindingQuery = query(
-                collection(db, 'sessionDeviceBindings'),
-                where('sessionId', '==', sessionId),
-                where('deviceId', '==', deviceId)
-            );
-            const bindingSnapshot = await getDocs(bindingQuery);
-
-            if (!bindingSnapshot.empty) {
-                // Device is already bound in this session to some user - prevent multiple check-ins per device
-                setMessage(`This device has already been used to check in for this session. Please use a different device or contact the organizer.`);
-                setCheckingIn(false);
-                return;
-            } else {
-                // No binding exists - create one
-                const bindingId = `${sessionId}_${deviceId}`;
-                await setDoc(doc(db, 'sessionDeviceBindings', bindingId), {
-                    sessionId,
-                    deviceId,
-                    userEmail,
-                    userName: checkinForm.name,
-                    boundAt: new Date(),
-                    adminId: session.adminId
-                });
-            }
-
-            // Check if user has checked in within the last 24 hours
+            // Parallelize: Check device binding and existing attendance
+            const bindingRef = doc(db, "sessionDeviceBindings", `${sessionId}_${deviceId}`);
             const attendanceQuery = query(
                 collection(db, 'attendanceRecords'),
                 where('sessionId', '==', sessionId),
                 where('email', '==', userEmail)
             );
 
-            const existingCheckins = await getDocs(attendanceQuery);
+            const [bindingSnap, attendanceSnapshot] = await Promise.all([
+                getDoc(bindingRef),
+                getDocs(attendanceQuery)
+            ]);
 
-            if (!existingCheckins.empty) {
-                // Get the most recent check-in
-                const lastCheckin = existingCheckins.docs
+            // Check device binding
+            if (bindingSnap.exists()) {
+                const existingBinding = bindingSnap.data();
+                if (existingBinding.uniqueIdentifier !== uniqueId) {
+                    setMessage("This device has already been used by another attendee.");
+                    setCheckingIn(false);
+                    return;
+                }
+                // Same user → allow multiple check-ins
+            } else {
+                // First time → bind device to this identity
+                await setDoc(bindingRef, {
+                    sessionId,
+                    deviceId,
+                    uniqueIdentifier: uniqueId,
+                    name: checkinForm.name,
+                    email: userEmail,
+                    phone: normalizedPhone,
+                    boundAt: new Date()
+                });
+            }
+
+            // Check if user has checked in recently (optional, can be removed if not needed)
+            if (!attendanceSnapshot.empty) {
+                const lastCheckin = attendanceSnapshot.docs
                     .sort((a, b) => b.data().checkInTime.toDate() - a.data().checkInTime.toDate())[0];
 
                 const lastCheckinTime = lastCheckin.data().checkInTime.toDate();
                 const now = new Date();
                 const hoursSinceLastCheckin = (now - lastCheckinTime) / (1000 * 60 * 60);
 
-              //  if (hoursSinceLastCheckin < 24) {
-              //      const remainingHours = Math.ceil(24 - hoursSinceLastCheckin);
-              //      setMessage(`Looks like you've already been checked in. To checkin again wait ${remainingHours} hours`);
-              //      setCheckingIn(false);
-              //      return;
-              //  }
+               
+                 if (hoursSinceLastCheckin < 6) {
+                     const remainingHours = Math.ceil(6 - hoursSinceLastCheckin);
+                     setMessage(`Looks like you've already been checked in. To checkin again wait ${remainingHours} hours`);
+                     setCheckingIn(false); 
+                     return;
+                 }
             }
 
-            // Create attendance record (centralized: enforces geofence when configured)
+            // Create attendance record
             const uniqueCode = generateUniqueCode();
             await submitAttendance({
                 memberId: participant?.memberId || null,
@@ -188,7 +199,7 @@ function SessionCheckin() {
                 captureLocation: true,
                 memberName: checkinForm.name,
                 email: userEmail,
-                phone: checkinForm.phone || '',
+                phone: normalizedPhone,
                 extra: {
                     participantId: participant?.id || null,
                     participantName: checkinForm.name,
@@ -199,7 +210,7 @@ function SessionCheckin() {
                 }
             });
 
-            // Save device recognition for future visits
+            // Save device recognition
             await saveDeviceRecognition(userEmail);
 
             setMessage('Check-in successful! Welcome to the session.');
@@ -361,6 +372,14 @@ function SessionCheckin() {
 
     return (
         <div className="session-checkin-container">
+            {checkingIn && (
+                <div className="checking-in-overlay">
+                    <div className="checking-in-box">
+                        <div className="checking-in-spinner" />
+                        <p>Checking you in... Please wait.</p>
+                    </div>
+                </div>
+            )}
             <div className="session-checkin-card">
                 <h1>{session.name}</h1>
                 {session.description && <p className="session-description">{session.description}</p>}

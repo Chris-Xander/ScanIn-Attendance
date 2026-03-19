@@ -1,6 +1,6 @@
 /* eslint-env node */
 const { setGlobalOptions } = require('firebase-functions/v2');
-const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
@@ -38,7 +38,6 @@ async function deleteChunkFrom(db, col, sessionId) {
 
 async function deleteAllDocsForSession(db, sessionId) {
   let deleted = 0;
-  /* eslint-disable no-constant-condition */
   while (true) {
     const deletedFromLogs = await deleteChunkFrom(db, 'attendanceLogs', sessionId);
     const deletedFromRecords = await deleteChunkFrom(db, 'attendanceRecords', sessionId);
@@ -88,7 +87,7 @@ exports.deleteSessionHttp = onRequest(
   async (req, res) => {
     let origin = req.get('Origin');
     if (!origin && req.get('Referer')) {
-      try { origin = new URL(req.get('Referer')).origin; } catch (_) {}
+      try { origin = new URL(req.get('Referer')).origin; } catch { /* ignore */ }
     }
     setCors(res, origin);
 
@@ -199,7 +198,6 @@ exports.processDeletionJob = onDocumentCreated(
 
     let totalProcessed = job.processedCount || 0;
     // Loop and process chunks until none left or we've processed totalCount
-    /* eslint-disable no-constant-condition */
     while (true) {
       const deletedFromLogs = await deleteChunkFrom(db, 'attendanceLogs', job.sessionId);
       const deletedFromRecords = await deleteChunkFrom(db, 'attendanceRecords', job.sessionId);

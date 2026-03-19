@@ -1,6 +1,5 @@
 /* eslint-env node */
 
-/* eslint-disable */
 /* eslint-env node */
 module.exports = {
   root: true,

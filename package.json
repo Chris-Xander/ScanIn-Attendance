@@ -21,6 +21,7 @@
     "gapi-script": "^1.2.0",
     "html5-qrcode": "^2.3.8",
     "jsqr": "^1.4.0",
+    "libphonenumber-js": "^1.12.40",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",

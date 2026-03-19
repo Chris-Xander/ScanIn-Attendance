@@ -551,6 +551,41 @@
   }
 }
 
+.registering-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 11000;
+  padding: 1rem;
+}
+
+.registering-box {
+  background: #fff;
+  padding: 28px 24px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  max-width: 320px;
+  width: 100%;
+}
+
+.registering-spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border: 6px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #1976d2;
+  border-radius: 50%;
+  animation: spinnerRotate 1s linear infinite;
+}
+
+@keyframes spinnerRotate {
+  to { transform: rotate(360deg); }
+}
+
 .qr-modal-content {
   background: #fff;
   border-radius: 16px;

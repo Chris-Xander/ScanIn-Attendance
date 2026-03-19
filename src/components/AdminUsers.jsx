@@ -16,9 +16,9 @@ function AdminUsers() {
     const [attendanceLogs, setAttendanceLogs] = useState([]);
     const { location, error, getLocation } = useDeviceLocation();
     const [loading, setLoading] = useState(false);
+    const [registering, setRegistering] = useState(false);
     const [showSessionSelectModal, setShowSessionSelectModal] = useState(false);
     const [selectedSessionId, setSelectedSessionId] = useState(null);
-    const batch = writeBatch(db);
 
 
     const NAME_FIELDS = [
@@ -87,6 +87,31 @@ function AdminUsers() {
 
         return '';
     }
+
+    const buildColumnMap = (sampleRow) => {
+        const map = {};
+        const keys = Object.keys(sampleRow || {});
+
+        for (const key of keys) {
+            const normalizedKey = key
+                .trim()
+                .toLowerCase()
+                .replace(/[^\w\s]/g, '')
+                .replace(/\s+/g, ' ');
+
+            if (normalizedKey.includes('name')) {
+                map.name = key;
+            }
+            if (normalizedKey.includes('email')) {
+                map.email = key;
+            }
+            if (normalizedKey.includes('phone') || normalizedKey.includes('contact')) {
+                map.phone = key;
+            }
+        }
+
+        return map;
+    };
 
 
     // Session form state
@@ -547,10 +572,10 @@ function AdminUsers() {
                     <div className="admin-db-btns">
                         <button
                             onClick={() => setShowSessionSelectModal(true)}
-                            disabled={!csvData.length || loading}
+                            disabled={!csvData.length || registering}
                             className="admin-db-open-btn"
                         >
-                            {loading ? 'Registering...' : 'Register Members'}
+                            {registering ? 'Registering...' : 'Register Members'}
                         </button>
                         <button
                             onClick={() => {
@@ -558,6 +583,7 @@ function AdminUsers() {
                                 setCsvFile(null);
                             }}
                             className="admin-db-delete-btn"
+                            disabled={registering}
                         >
                             Clear Upload
                         </button>
@@ -863,68 +889,98 @@ function AdminUsers() {
                 return;
             }
 
-            setLoading(true);
+            setRegistering(true);
             try {
                 const participantsRef = collection(db, 'participants');
                 const metaRef = collection(db, 'sessionMemberData');
+
+                // Build a column map once to avoid O(rows x columns) lookups
+                const columnMap = buildColumnMap(csvData[0] || {});
+
                 // Fetch existing participants for this session to prevent duplicate registrations
                 const existingParticipantsSnapshot = await getDocs(query(participantsRef, where('sessionId', '==', sessionId), where('adminId', '==', currentUser.uid)));
                 const existingParticipantIds = new Set(existingParticipantsSnapshot.docs.map(d => d.data()?.uniqueIdentifier).filter(Boolean));
-                const batch = [];
+
+                let batch = writeBatch(db);
+                let batchWriteCount = 0;
                 const errors = [];
                 const uniqueIdentifiers = new Set();
                 let registeredCount = 0;
 
+                const flushBatchIfNeeded = async () => {
+                    if (batchWriteCount === 0) return;
+                    await batch.commit();
+                    batch = writeBatch(db);
+                    batchWriteCount = 0;
+                };
+
                 for (let i = 0; i < csvData.length; i++) {
                     const row = csvData[i];
-                    const name = findColumnValue(row, NAME_FIELDS)
-                    const email = findColumnValue(row, EMAIL_FIELDS)
-                    const phone = findColumnValue(row, PHONE_FIELDS)
+                    const name = columnMap.name
+                        ? (row[columnMap.name] || '').toString().trim()
+                        : (findColumnValue(row, NAME_FIELDS) || '').toString().trim();
+                    const emailRaw = columnMap.email
+                        ? (row[columnMap.email] || '').toString().trim()
+                        : (findColumnValue(row, EMAIL_FIELDS) || '').toString().trim();
+                    const phoneRaw = columnMap.phone
+                        ? (row[columnMap.phone] || '').toString().trim()
+                        : (findColumnValue(row, PHONE_FIELDS) || '').toString().trim();
 
-                    if (!name || (!email && !phone)) {
-                        errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${(!email && !phone) ? 'missing' : 'present'}`);
+                    if (!name || (!emailRaw && !phoneRaw)) {
+                        errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${(!emailRaw && !phoneRaw) ? 'missing' : 'present'}`);
                         continue;
                     }
 
-                    const normalizedPhone = (phone || '').replace(/\D/g, '');
-                    const uniqueId = createIdentityKey(name, email, normalizedPhone);
+                    const normalizedPhone = (phoneRaw || '').replace(/\D/g, '');
+                    const uniqueId = createIdentityKey(name, emailRaw, normalizedPhone);
                     if (uniqueIdentifiers.has(uniqueId)) {
                         errors.push(`Row ${i + 1}: Duplicate identifier for '${name}'`);
                         continue;
                     }
+
                     // Skip if already registered for this session
                     if (existingParticipantIds.has(uniqueId)) {
                         errors.push(`Row ${i + 1}: Participant already registered for this session: '${name}'`);
                         continue;
                     }
+
                     uniqueIdentifiers.add(uniqueId);
 
                     const participantData = {
                         sessionId: sessionId,
                         adminId: currentUser.uid,
                         name,
-                        email: (email || '').toLowerCase(),
-                        phone: phone,
+                        email: (emailRaw || '').toLowerCase(),
+                        phone: phoneRaw,
                         uniqueIdentifier: uniqueId,
                         registeredAt: new Date(),
                         status: 'registered'
                     };
-                    batch.push(addDoc(participantsRef, participantData));
+
+                    const participantDocRef = doc(participantsRef);
+                    batch.set(participantDocRef, participantData);
 
                     const meta = {
                         sessionId: sessionId,
                         adminId: currentUser.uid,
                         uniqueIdentifier: uniqueId,
                         name,
-                        email: (email || '').toLowerCase(),
-                        phone: phone,
+                        email: (emailRaw || '').toLowerCase(),
+                        phone: phoneRaw,
                         rawRow: row,
                         registeredAt: new Date()
                     };
-                    batch.push(addDoc(metaRef, meta));
-                    // Mark as existing to avoid duplicates within this upload
-                    existingParticipantIds.add(uniqueId);
+                    const metaDocRef = doc(metaRef);
+                    batch.set(metaDocRef, meta);
+
+                    batchWriteCount += 2;
                     registeredCount += 1;
+                    existingParticipantIds.add(uniqueId);
+
+                    // Firestore write batches max out at 500 operations.
+                    if (batchWriteCount >= 450) {
+                        await flushBatchIfNeeded();
+                    }
                 }
 
                 if (errors.length > 0) {
@@ -932,8 +988,9 @@ function AdminUsers() {
                     alert(`Validation errors found:\n${errors.join('\n')}\n\nOnly valid participants will be registered.`);
                 }
 
+                await flushBatchIfNeeded();
+
                 if (registeredCount > 0) {
-                    await Promise.all(batch);
                     alert(`Successfully registered ${registeredCount} participants for the selected session!`);
                     fetchSessions(); // Refresh session data if needed
                 } else {
@@ -948,7 +1005,7 @@ function AdminUsers() {
                 console.error('Error registering participants:', error);
                 alert('Failed to register participants');
             } finally {
-                setLoading(false);
+                setRegistering(false);
             }
         };
 
@@ -1074,6 +1131,14 @@ function AdminUsers() {
 
     return (
         <div>
+            {registering && (
+                <div className="registering-overlay">
+                    <div className="registering-box">
+                        <div className="registering-spinner" />
+                        <p>Registering members... Please wait.</p>
+                    </div>
+                </div>
+            )}
             {/* Tab Navigation */}
             <div className="tab-navigation">
                 <button
@@ -1177,7 +1242,7 @@ function AdminUsers() {
                     <button
                         onClick={() => setShowSessionSelectModal(false)}
                         className="admin-db-open-btn"
-                        disabled={loading}
+                        disabled={registering}
                     >
                         Cancel
                     </button>
@@ -1189,9 +1254,9 @@ function AdminUsers() {
                             }
                         }}
                         className="admin-db-open-btn"
-                        disabled={!selectedSessionId || loading}
+                        disabled={!selectedSessionId || registering}
                     >
-                        {loading ? 'Registering...' : 'Confirm Registration'}
+                        {registering ? 'Registering...' : 'Confirm Registration'}
                     </button>
                 </div>
             </div>
