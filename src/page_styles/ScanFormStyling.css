@@ -38,6 +38,7 @@
   width: 100%;
   padding: 24px;
   min-height: 100vh;
+  background: linear-gradient(135deg, #fbfbfb 0%, #289eff 100%);
 }
 
 /* Container for the form */

@@ -96,11 +96,11 @@ function SessionCheckin() {
                     email: participantData.email || '',
                     phone: participantData.phone || ''
                 });
-                setMessage('Welcome! You are pre-registered for this session. Your details have been auto-filled.');
+                setMessage('Welcome ✓ You are pre-registered for this session. Your details have been auto-filled.');
             } else {
                 setIsRegistered(false);
                 setParticipant(null);
-                setMessage('You are not pre-registered for this session. Please contact the organizer.');
+                setMessage('Sorry X You are not pre-registered for this session. Please contact the organizer.');
             }
         } catch (error) {
             console.error('Error checking participant registration:', error);

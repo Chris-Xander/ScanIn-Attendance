@@ -30,6 +30,21 @@
   font-size: 1.1rem;
 }
 
+.registration-check h2 {
+  color: rgb(12, 66, 110);
+}
+
+.registration-check p {
+  color: #555;
+  margin-top: 0.5rem;
+  font-size: 1rem;
+}
+
+.registration-status.success{
+  color: #28a745;
+  font-weight: 600;
+}
+
 .session-details {
   background: #f8f9fa;
   border-radius: 8px;
