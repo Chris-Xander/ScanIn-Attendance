@@ -5,7 +5,7 @@ function DataRetentionPolicy() {
     return (
         <div className="data-retention-main">
             <div className="data-retention-header">
-                <h1>Data Retention Policy for ScanIn (Attendid)</h1>
+                <h1>Data Retention Policy for KansoCheckin (Attendid)</h1>
                 <p><strong>Effective Date:</strong> [25/12/2025]</p>
                 <p><strong>Last Updated:</strong> [02/01/2026]</p>
             </div>
@@ -13,17 +13,17 @@ function DataRetentionPolicy() {
             <div className="data-retention-content">
                 <section>
                     <h2>Introduction</h2>
-                    <p>This Data Retention Policy explains how ScanIn (also known as Attendid) ("ScanIn," "we," "our," or "us") retains, stores, and deletes data collected through our attendance management platform.</p>
+                    <p>This Data Retention Policy explains how KansoCheckin (also known as Attendid) ("KansoCheckin," "we," "our," or "us") retains, stores, and deletes data collected through our attendance management platform.</p>
                     <p>We are committed to retaining data only for as long as necessary to provide our services, meet organizational needs, and comply with legal obligations. This policy outlines our data retention practices, including specific retention periods for different types of data, deletion procedures, and the factors that influence how long we keep information.</p>
                     <p>Our approach to data retention is guided by principles of data minimization, privacy by design, and compliance with applicable data protection laws. We regularly review and update our retention practices to ensure they remain appropriate and compliant.</p>
-                    <p>This policy applies to all data collected, processed, or stored through the ScanIn platform, whether collected directly from users or generated through system operations.</p>
+                    <p>This policy applies to all data collected, processed, or stored through the KansoCheckin platform, whether collected directly from users or generated through system operations.</p>
                 </section>
 
                 <section>
                     <h2>Scope</h2>
-                    <p>This Data Retention Policy applies to all data collected, processed, or stored through the ScanIn platform, including but not limited to:</p>
+                    <p>This Data Retention Policy applies to all data collected, processed, or stored through the KansoCheckin platform, including but not limited to:</p>
                     <ul>
-                        <li><strong>Web Application Data:</strong> Information collected through the main ScanIn web interface, including user interactions, form submissions, and system usage data</li>
+                        <li><strong>Web Application Data:</strong> Information collected through the main KansoCheckin web interface, including user interactions, form submissions, and system usage data</li>
                         <li><strong>Progressive Web App (PWA) Data:</strong> Data collected through the mobile-optimized PWA version, including offline usage and synchronization data</li>
                         <li><strong>QR Code Sessions:</strong> Attendance data captured through QR code scanning, including timestamps, location data, and device information</li>
                         <li><strong>Form-Based Submissions:</strong> Information collected through custom attendance forms, surveys, and registration processes</li>
@@ -36,7 +36,7 @@ function DataRetentionPolicy() {
 
                 <section>
                     <h2>General Retention Principle</h2>
-                    <p>ScanIn follows the fundamental principle of data minimization as outlined in modern data protection regulations. This means we are committed to:</p>
+                    <p>KansoCheckin follows the fundamental principle of data minimization as outlined in modern data protection regulations. This means we are committed to:</p>
                     <ul>
                         <li><strong>Minimal Retention:</strong> Retaining personal data only for the minimum period necessary to fulfill the purposes for which it was collected</li>
                         <li><strong>Purpose Limitation:</strong> Using retained data only for the specific purposes for which it was originally collected</li>
@@ -44,13 +44,13 @@ function DataRetentionPolicy() {
                         <li><strong>Regular Review:</strong> Periodically reviewing retained data to ensure it is still necessary and relevant</li>
                         <li><strong>Secure Deletion:</strong> Implementing secure deletion procedures when data is no longer needed</li>
                     </ul>
-                    <p>In many cases, the retention periods for attendance data are determined by the organization or administrator using ScanIn, rather than by ScanIn itself. Organizations may have their own policies regarding how long attendance records should be maintained based on their operational, legal, or compliance requirements.</p>
+                    <p>In many cases, the retention periods for attendance data are determined by the organization or administrator using KansoCheckin, rather than by KansoCheckin itself. Organizations may have their own policies regarding how long attendance records should be maintained based on their operational, legal, or compliance requirements.</p>
                     <p>We work closely with organizations to ensure that our retention practices align with their specific needs while maintaining compliance with applicable privacy laws and regulations.</p>
                 </section>
 
                 <section>
                     <h2>Categories of Data and Retention Periods</h2>
-                    <p>ScanIn categorizes data based on its type, sensitivity, and purpose. Each category has specific retention periods designed to balance operational needs with privacy requirements. The following table outlines our standard retention periods:</p>
+                    <p>KansoCheckin categorizes data based on its type, sensitivity, and purpose. Each category has specific retention periods designed to balance operational needs with privacy requirements. The following table outlines our standard retention periods:</p>
 
                     <table>
                         <thead>
@@ -105,14 +105,14 @@ function DataRetentionPolicy() {
                     <p>Retention: Account data is stored while the account remains active. After account deletion, data is retained for 30 days to allow for recovery requests, then permanently deleted or anonymized.</p>
 
                     <h3>Attendance Records</h3>
-                    <p>Attendance data forms the core of our service and includes check-in records, timestamps, form responses, and session participation details. This data is typically retained according to organizational policies rather than fixed ScanIn policies.</p>
+                    <p>Attendance data forms the core of our service and includes check-in records, timestamps, form responses, and session participation details. This data is typically retained according to organizational policies rather than fixed KansoCheckin policies.</p>
                     <ul>
                         <li><strong>Standard Retention:</strong> 6-36 months depending on organizational requirements</li>
                         <li><strong>Educational Institutions:</strong> Often 1-2 years for academic record-keeping</li>
                         <li><strong>Corporate Events:</strong> May be retained for 6-12 months for reporting purposes</li>
                         <li><strong>Custom Retention:</strong> Organizations can request shorter or longer retention periods</li>
                     </ul>
-                    <p>Administrators can request early deletion of attendance data through the ScanIn interface or by contacting support.</p>
+                    <p>Administrators can request early deletion of attendance data through the KansoCheckin interface or by contacting support.</p>
 
                     <h3>Device and Session Logs</h3>
                     <p>Technical logs help maintain system security and prevent fraudulent activities. This includes device fingerprints, IP addresses, session identifiers, and access patterns.</p>
@@ -137,7 +137,7 @@ function DataRetentionPolicy() {
 
                 <section>
                     <h2>Deletion and Anonymization</h2>
-                    <p>ScanIn implements comprehensive procedures for data deletion and anonymization when retention periods expire or when data is no longer needed. Our deletion processes ensure that data is permanently and irreversibly removed from our systems.</p>
+                    <p>KansoCheckin implements comprehensive procedures for data deletion and anonymization when retention periods expire or when data is no longer needed. Our deletion processes ensure that data is permanently and irreversibly removed from our systems.</p>
 
                     <h3>Deletion Triggers</h3>
                     <p>Data deletion is initiated when:</p>
@@ -146,7 +146,7 @@ function DataRetentionPolicy() {
                         <li><strong>Account Deletion:</strong> User requests account removal through the application</li>
                         <li><strong>Organizational Request:</strong> Administrator requests deletion of specific data sets</li>
                         <li><strong>Legal Requirements:</strong> Court orders or legal obligations require data removal</li>
-                        <li><strong>Service Termination:</strong> User or organization ends their relationship with ScanIn</li>
+                        <li><strong>Service Termination:</strong> User or organization ends their relationship with KansoCheckin</li>
                         <li><strong>Data No Longer Needed:</strong> Periodic review determines data is obsolete</li>
                     </ul>
 
@@ -176,7 +176,7 @@ function DataRetentionPolicy() {
 
                 <section>
                     <h2>Administrator-Controlled Data</h2>
-                    <p>Organizations and administrators using ScanIn have significant control over the data collected through their attendance sessions and user accounts. This reflects the principle that organizations, not ScanIn, are typically the primary data controllers for attendance information.</p>
+                    <p>Organizations and administrators using KansoCheckin have significant control over the data collected through their attendance sessions and user accounts. This reflects the principle that organizations, not KansoCheckin, are typically the primary data controllers for attendance information.</p>
 
                     <h3>Administrator Rights</h3>
                     <p>Administrators can:</p>
@@ -189,7 +189,7 @@ function DataRetentionPolicy() {
                     </ul>
 
                     <h3>Data Ownership</h3>
-                    <p>While ScanIn provides the platform and infrastructure, organizations typically own the attendance data collected through their sessions. This includes:</p>
+                    <p>While KansoCheckin provides the platform and infrastructure, organizations typically own the attendance data collected through their sessions. This includes:</p>
                     <ul>
                         <li><strong>Attendance Records:</strong> Check-in data, form responses, and participation records</li>
                         <li><strong>User Data:</strong> Information about members and participants in their events</li>
@@ -198,7 +198,7 @@ function DataRetentionPolicy() {
                     </ul>
 
                     <h3>User Data Requests</h3>
-                    <p>For data deletion or access requests, users should first contact their organization administrator, as the organization is typically best positioned to handle such requests. ScanIn will assist organizations in fulfilling user rights requests as needed.</p>
+                    <p>For data deletion or access requests, users should first contact their organization administrator, as the organization is typically best positioned to handle such requests. KansoCheckin will assist organizations in fulfilling user rights requests as needed.</p>
                 </section>
 
                 <section>
@@ -262,7 +262,7 @@ function DataRetentionPolicy() {
 
                 <section>
                     <h2>Data Retention Review Process</h2>
-                    <p>ScanIn maintains a systematic process for reviewing and managing data retention to ensure ongoing compliance and appropriateness.</p>
+                    <p>KansoCheckin maintains a systematic process for reviewing and managing data retention to ensure ongoing compliance and appropriateness.</p>
 
                     <h3>Regular Reviews</h3>
                     <ul>
@@ -292,14 +292,14 @@ function DataRetentionPolicy() {
                         <li>Provide a summary of key changes when appropriate</li>
                     </ul>
                     <p>We encourage users and organizations to review this policy periodically to stay informed about our data retention practices.</p>
-                    <p>Continued use of the ScanIn service after any changes to this policy constitutes acceptance of the updated terms.</p>
+                    <p>Continued use of the KansoCheckin service after any changes to this policy constitutes acceptance of the updated terms.</p>
                 </section>
 
                 <section>
                     <h2>Contact Information</h2>
                     <p>If you have questions about this Data Retention Policy, our data retention practices, or need to request data deletion:</p>
                     <p><strong>Email:</strong> [Insert Contact Email]</p>
-                    <p><strong>Service Name:</strong> ScanIn (Attendid)</p>
+                    <p><strong>Service Name:</strong> KansoCheckin (Attendid)</p>
                     <p><strong>Response Time:</strong> We aim to respond to data retention inquiries within 30 days.</p>
                     <p>For urgent data deletion requests or privacy concerns, please contact us immediately.</p>
                     <p>Organizations should contact their account administrator for assistance with data management within their organization.</p>

@@ -5,7 +5,7 @@ function PrivacyPolicy() {
     return(
         <div className="privacyMain">
             <div className="privacyHeader">
-                <h1>Privacy Policy - ScanIn (Attendid)</h1>
+                <h1>Privacy Policy - KansoCheckin (Attendid)</h1>
                 <p><strong>Effective Date:</strong> [25/12/2025]</p>
                 <p><strong>Last Updated:</strong> [09/02/2026]</p>
             </div>
@@ -13,16 +13,16 @@ function PrivacyPolicy() {
             <div className="privacyContent">
                 <section>
                     <h2> Introduction</h2>
-                    <p>Welcome to ScanIn (also known as Attendid) ("ScanIn," "we," "our," or "us").</p>
-                    <p>ScanIn is a digital attendance management platform that enables organizations, institutions, and event administrators to record and manage attendance using QR codes, forms, and device-based verification.</p>
-                    <p>This Privacy Policy explains how we collect, use, store, and protect personal information when you use the ScanIn web application and related services (the "Service").</p>
-                    <p>By using ScanIn, you agree to the collection and use of information in accordance with this Privacy Policy.</p>
+                    <p>Welcome to KansoCheckin (also known as Attendid) ("KansoCheckin," "we," "our," or "us").</p>
+                    <p>KansoCheckin is a digital attendance management platform that enables organizations, institutions, and event administrators to record and manage attendance using QR codes, forms, and device-based verification.</p>
+                    <p>This Privacy Policy explains how we collect, use, store, and protect personal information when you use the KansoCheckin web application and related services (the "Service").</p>
+                    <p>By using KansoCheckin, you agree to the collection and use of information in accordance with this Privacy Policy.</p>
                 </section>
 
                 <section>
                     <h2> Who Controls Your Data</h2>
-                    <p>In many cases, the organization or administrator that invited you to use ScanIn (such as a school, company, or event organizer) acts as the primary controller of attendance-related data.</p>
-                    <p>ScanIn acts as a service provider and data processor, providing tools to collect and manage attendance data on behalf of those organizations.</p>
+                    <p>In many cases, the organization or administrator that invited you to use KansoCheckin (such as a school, company, or event organizer) acts as the primary controller of attendance-related data.</p>
+                    <p>KansoCheckin acts as a service provider and data processor, providing tools to collect and manage attendance data on behalf of those organizations.</p>
                     <p>Questions about specific attendance records should first be directed to your organization or administrator.</p>
                 </section>
 
@@ -75,7 +75,7 @@ function PrivacyPolicy() {
                     <p>Location is used only at the time of attendance verification. We do not continuously track user location.</p>
 
                     <h3> Camera Access</h3>
-                    <p>Camera access may be requested solely for QR code scanning. ScanIn does not record or store video or images from your camera.</p>
+                    <p>Camera access may be requested solely for QR code scanning. KansoCheckin does not record or store video or images from your camera.</p>
                 </section>
 
                 <section>
@@ -145,7 +145,7 @@ function PrivacyPolicy() {
                         <li>Legal or compliance purposes</li>
                         <li>Security and fraud prevention</li>
                     </ul>
-                    <p>Retention periods are typically determined by the organization using ScanIn.</p>
+                    <p>Retention periods are typically determined by the organization using KansoCheckin.</p>
                 </section>
 
                 <section>
@@ -168,13 +168,13 @@ function PrivacyPolicy() {
 
                 <section>
                     <h2> Children's Privacy</h2>
-                    <p>ScanIn is not intended for unsupervised use by children under the age of 16.</p>
+                    <p>KansoCheckin is not intended for unsupervised use by children under the age of 16.</p>
                     <p>Where used by schools or institutions, the organization is responsible for appropriate consent and supervision.</p>
                 </section>
 
                 <section>
                     <h2> Third-Party Links</h2>
-                    <p>ScanIn may contain links to third-party services. We are not responsible for their privacy practices.</p>
+                    <p>KansoCheckin may contain links to third-party services. We are not responsible for their privacy practices.</p>
                 </section>
 
                 <section>

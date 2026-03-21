@@ -5,7 +5,7 @@ function CookiePolicy() {
     return (
         <div className="cookie-policy-main">
             <div className="cookie-policy-header">
-                <h1>Cookie Policy for ScanIn (Attendid)</h1>
+                <h1>Cookie Policy for KansoCheckin (Attendid)</h1>
                 <p><strong>Effective Date:</strong> [25/12/2025]</p>
                 <p><strong>Last Updated:</strong> [02/01/2026]</p>
             </div>
@@ -13,9 +13,9 @@ function CookiePolicy() {
             <div className="cookie-policy-content">
                 <section>
                     <h2>Introduction</h2>
-                    <p>This Cookie Policy explains how ScanIn (also known as Attendid) ("ScanIn," "we," "our," or "us") uses cookies and similar technologies when you use our web application, progressive web app, and related services (collectively referred to as the "Service").</p>
+                    <p>This Cookie Policy explains how KansoCheckin (also known as Attendid) ("KansoCheckin," "we," "our," or "us") uses cookies and similar technologies when you use our web application, progressive web app, and related services (collectively referred to as the "Service").</p>
                     <p>Cookies are essential to the functioning of our Service and help us provide you with a better, more personalized experience. This policy describes what cookies are, how we use them, your rights regarding cookies, and how you can control cookie settings.</p>
-                    <p>By continuing to use ScanIn, you agree to the use of cookies as described in this policy. If you do not agree to the use of cookies, you should adjust your browser settings accordingly or discontinue use of the Service.</p>
+                    <p>By continuing to use KansoCheckin, you agree to the use of cookies as described in this policy. If you do not agree to the use of cookies, you should adjust your browser settings accordingly or discontinue use of the Service.</p>
                     <p>This Cookie Policy should be read in conjunction with our Privacy Policy, which provides more information about how we collect, use, and protect your personal data.</p>
                 </section>
 
@@ -27,7 +27,7 @@ function CookiePolicy() {
                     <ul>
                         <li><strong>Session Cookies:</strong> Temporary cookies that expire when you close your browser. They are used to maintain your session state and remember your actions during a browsing session.</li>
                         <li><strong>Persistent Cookies:</strong> Cookies that remain on your device for a set period or until you delete them. They help websites remember your preferences and settings across multiple visits.</li>
-                        <li><strong>First-Party Cookies:</strong> Cookies set directly by the website you are visiting (in this case, ScanIn).</li>
+                        <li><strong>First-Party Cookies:</strong> Cookies set directly by the website you are visiting (in this case, KansoCheckin).</li>
                         <li><strong>Third-Party Cookies:</strong> Cookies set by domains other than the one you are visiting, typically from embedded content or services provided by other companies.</li>
                         <li><strong>Similar Technologies:</strong> This may include web beacons, pixel tags, local storage, session storage, and other tracking technologies that serve similar purposes to cookies.</li>
                     </ul>
@@ -36,7 +36,7 @@ function CookiePolicy() {
 
                 <section>
                     <h2>How We Use Cookies</h2>
-                    <p>ScanIn uses cookies and similar technologies for several important purposes that help us provide, maintain, and improve our Service. We categorize our cookie usage into different types based on their purpose and necessity.</p>
+                    <p>KansoCheckin uses cookies and similar technologies for several important purposes that help us provide, maintain, and improve our Service. We categorize our cookie usage into different types based on their purpose and necessity.</p>
 
                     <h3>Essential Cookies</h3>
                     <p>These cookies are strictly necessary for the Service to function properly and cannot be disabled. They enable core functionality and security features.</p>
@@ -50,7 +50,7 @@ function CookiePolicy() {
                         <li>Load balancing and server routing</li>
                         <li>Basic error handling and debugging</li>
                     </ul>
-                    <p>Without these essential cookies, key features of ScanIn would not work properly, and you may not be able to access certain parts of the Service.</p>
+                    <p>Without these essential cookies, key features of KansoCheckin would not work properly, and you may not be able to access certain parts of the Service.</p>
 
                     <h3>Functional Cookies</h3>
                     <p>These cookies enhance usability and provide a better user experience by remembering your preferences and choices.</p>
@@ -93,7 +93,7 @@ function CookiePolicy() {
 
                 <section>
                     <h2>Third-Party Cookies</h2>
-                    <p>ScanIn integrates with various third-party services and platforms to provide our Service. Some of these services may place their own cookies on your device when you use ScanIn.</p>
+                    <p>KansoCheckin integrates with various third-party services and platforms to provide our Service. Some of these services may place their own cookies on your device when you use KansoCheckin.</p>
                     <p>Third-party services we use may include:</p>
                     <ul>
                         <li><strong>Firebase Services:</strong> Authentication, database, storage, hosting, and analytics services provided by Google. Firebase may use cookies for session management, security, and performance monitoring.</li>
@@ -115,7 +115,7 @@ function CookiePolicy() {
                         <li><strong>Functional Cookies:</strong> Usually persist for 30 days to 2 years to remember your preferences across visits.</li>
                         <li><strong>Analytics Cookies:</strong> Typically expire after 26 months, following industry standards for web analytics.</li>
                     </ul>
-                    <p>Cookies are stored securely on your device and can only be accessed by the domain that created them. ScanIn cookies are encrypted and follow industry security standards.</p>
+                    <p>Cookies are stored securely on your device and can only be accessed by the domain that created them. KansoCheckin cookies are encrypted and follow industry security standards.</p>
                     <p>You can view and manage stored cookies through your browser's developer tools or cookie management interfaces.</p>
                 </section>
 
@@ -141,7 +141,7 @@ function CookiePolicy() {
                     </ul>
                     <p><strong>Important Notes:</strong></p>
                     <ul>
-                        <li>Disabling essential cookies may prevent ScanIn from functioning properly</li>
+                        <li>Disabling essential cookies may prevent KansoCheckin from functioning properly</li>
                         <li>You may need to log in again if session cookies are cleared</li>
                         <li>Some features may be limited or unavailable without certain cookies</li>
                         <li>Cookie settings are specific to each browser and device</li>
@@ -185,7 +185,7 @@ function CookiePolicy() {
                     <h2>Contact Information</h2>
                     <p>If you have questions about this Cookie Policy, our cookie practices, or your rights regarding cookies:</p>
                     <p><strong>Email:</strong> [Insert Contact Email]</p>
-                    <p><strong>Service Name:</strong> ScanIn (Attendid)</p>
+                    <p><strong>Service Name:</strong> KansoCheckin (Attendid)</p>
                     <p><strong>Response Time:</strong> We aim to respond to cookie-related inquiries within 30 days.</p>
                     <p>For urgent privacy or security concerns, please contact us immediately.</p>
                 </section>

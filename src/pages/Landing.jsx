@@ -50,7 +50,7 @@ function Landing() {
       <section className="landing-hero">
         <img ref={illustrationRef} src={qrIllustration} alt="QR Code Scanning" className={`landing-illustration ${animateIllustration ? 'animate-from-bottom' : 'default-visible'}`} />
         <div className="landing-hero-content">
-          <h2>Welcome to ScanIn Attendance Tracking</h2>
+          <h2>Welcome to KansoCheckin Attendance Tracking</h2>
           <p>Modern, secure, and easy-to-use attendance management for organizations, schools, and events. Scan, track, and manage attendance in real time with our App today!</p>
           <p>Click the button below to get started or scan your attendance!</p>
           <div className="landing-btn-container">
@@ -110,7 +110,7 @@ function Landing() {
           <Link to="/data-retention-policy" className="footer-link">  Data-Retention Policy  |</Link>
           <Link to="/cookie-policy" className="footer-link">  Cookie Policy</Link>
         </div>
-        <p className="landing-copyright">&copy; {new Date().getFullYear()} ScanIn. All rights reserved.</p>
+        <p className="landing-copyright">&copy; {new Date().getFullYear()} KansoCheckin. All rights reserved.</p>
       </footer>
     </div>
   );
