@@ -150,6 +150,10 @@
   border: 1px solid #f5c6cb;
 }
 
+.scanform-modal.scanform-modal-success {
+ background-color: #add3f2;
+}
+
 .back-btn {
   background: #6c757d;
   color: white;

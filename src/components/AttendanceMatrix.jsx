@@ -86,7 +86,7 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
             // Note: formData is already stored in attendanceRecords, no need to fetch formSubmitData separately
             // This avoids permission issues and improves performance
 
-            // Create a unique row per attendance record (not deduplicated)
+            // Group records by person and consolidate their check-ins
             const daySet = new Set();
             const toDateObj = (val) => {
                 if (!val) return null;
@@ -96,7 +96,10 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                 try { return new Date(val); } catch (e) { return null; }
             };
 
-            const rows = records.map(r => {
+            // Create a map to group records by person (using email as primary key, fallback to name)
+            const personMap = new Map();
+
+            records.forEach(r => {
                 // Extract name: prioritize formData.name (from form submission), then memberName, then fallback
                 const displayName = 
                     (r.formData && typeof r.formData === 'object' && (
@@ -109,6 +112,10 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                     r.deviceToken || 
                     'Unknown';
                 
+                const email = r.email || '';
+                // Use email as key if available, otherwise use name for grouping
+                const personKey = email || displayName;
+
                 // Normalize timestamp/checkInTime into a Date object
                 const dateObj = toDateObj(r.checkInTime || r.timestamp);
                 const dateStr = dateObj ? dateObj.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
@@ -117,21 +124,36 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
 
                 const timeText = dateObj && !isNaN(dateObj.getTime()) ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
-                return {
-                    id: r.id,
-                    name: displayName,
-                    email: r.email || '',
-                    phone: r.phone || '',
-                    formData: r.formData,
-                    days: {
-                        [dateStr]: {
-                            status: r.status || 'present',
-                            time: timeText,
-                            token: r.deviceToken || r.code || r.token || ''
-                        }
-                    }
+                // If this person doesn't exist in the map yet, create their entry
+                if (!personMap.has(personKey)) {
+                    personMap.set(personKey, {
+                        name: displayName,
+                        email: email,
+                        phone: r.phone || '',
+                        formData: r.formData,
+                        firstId: r.id,
+                        days: {}
+                    });
+                }
+
+                // Add this check-in to the person's days
+                const person = personMap.get(personKey);
+                person.days[dateStr] = {
+                    status: r.status || 'present',
+                    time: timeText,
+                    token: r.deviceToken || r.code || r.token || ''
                 };
             });
+
+            // Convert map to array of consolidated rows
+            const rows = Array.from(personMap.values()).map((person) => ({
+                id: person.firstId,
+                name: person.name,
+                email: person.email,
+                phone: person.phone,
+                formData: person.formData,
+                days: person.days
+            }));
 
             const sortedDays = Array.from(daySet).sort();
             setDays(sortedDays);

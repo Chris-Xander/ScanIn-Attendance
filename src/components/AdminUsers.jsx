@@ -74,6 +74,17 @@ function AdminUsers() {
         return null; // No valid identifier available
     };
 
+    const toggleActive = async (sessionId, currentStatus) => {
+            try {
+                await updateDoc(doc(db, 'sessions', sessionId), {
+                    isActive: !currentStatus
+                });
+                fetchSessions();
+            } catch (error) {
+                console.error('Error updating Session:', error);
+            } 
+        };
+
     const findColumnValue = (row, allowedFields) => {
         const keys = Object.keys(row);
 
@@ -205,7 +216,7 @@ function AdminUsers() {
             await fetchAllSessionParticipants();
         } catch (error) {
             console.error('Error fetching sessions:', error);
-        }
+        } 
     };
 
     const fetchAttendanceLogs = async () => {
@@ -855,11 +866,8 @@ function AdminUsers() {
                                 >
                                     View QR Code
                                 </button>
-                                <button
-                                    onClick={() => exportSessionAttendance(session.id, session.name)}
-                                    className="admin-db-open-btn"
-                                >
-                                    Export Attendance
+                                <button className='admin-db-status-btn' onClick={() => toggleActive(session.id, session.isActive)}>
+                                    {session.isActive ? 'Deactivate' : 'Activate'}
                                 </button>
                             </div>
                         </div>

@@ -30,8 +30,11 @@ function SessionCheckin() {
         email: '',
         phone: ''
     });
-    const [checkingIn, setCheckingIn] = useState(false);
+const [checkingIn, setCheckingIn] = useState(false);
     const [message, setMessage] = useState('');
+    const [error, setError] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+    const [modalType, setModalType] = useState(null);
     const [participant, setParticipant] = useState(null);
     const [isRegistered, setIsRegistered] = useState(false);
     const [checkingRegistration, setCheckingRegistration] = useState(false);
@@ -58,6 +61,18 @@ function SessionCheckin() {
         recognizeDevice();
     }, [sessionId]);
 
+    useEffect(() => {
+            // Show loading modal on initial load
+            if (loading && !error) {
+                setShowModal(true);
+                setModalType('loading');
+            } else if (!loading && !error) {
+                // Loading finished successfully, hide modal
+                setShowModal(false);
+                setModalType(null);
+            }
+        }, [loading, error]);
+
     const fetchSession = async () => {
         try {
             const sessionDoc = await getDoc(doc(db, 'sessions', sessionId));
@@ -74,6 +89,71 @@ function SessionCheckin() {
             setLoading(false);
         }
     };
+
+    const FeedbackModal = () => {
+		if (!showModal) return null;
+
+		const handleModalClose = () => {
+			if (modalType === 'success') {
+				navigate('/');
+				setCheckinForm({ name: '', email: '', phone: '' });
+			} else {
+				setShowModal(false);
+				setModalType(null);
+				setError(null);
+			}
+		};
+
+		const getModalContent = () => {
+			switch (modalType) {
+				case 'loading':
+					return {
+						title: 'Loading...',
+						message: 'Please wait while we process your request.',
+						icon: '⏳',
+						showButton: false
+					};
+				case 'error':
+					return {
+						title: 'Error',
+						message: error,
+						icon: '❌',
+						showButton: true,
+						buttonText: 'Try Again'
+					};
+				case 'success':
+					return {
+						title: 'Success!',
+						message: 'Attendance recorded successfully.',
+						icon: '✅',
+						showButton: true,
+						buttonText: 'Done'
+					};
+				default:
+					return { title: '', message: '', icon: '', showButton: false };
+			}
+		};
+
+		const content = getModalContent();
+
+		return (
+			<div className="scanform-modal-overlay">
+				<div className={`scanform-modal scanform-modal-${modalType}`}>
+					<div className="scanform-modal-icon">{content.icon}</div>
+					<h2 className="scanform-modal-title">{content.title}</h2>
+					<p className="scanform-modal-message">{content.message}</p>
+					{content.showButton && (
+						<button className="scanform-modal-button" onClick={handleModalClose}>
+							{content.buttonText}
+						</button>
+					)}
+					{!content.showButton && modalType === 'loading' && (
+						<div className="scanform-spinner"></div>
+					)}
+				</div>
+			</div>
+		);
+	};
 
     const checkParticipantRegistration = async (email) => {
         if (!email || !session) return;
@@ -215,8 +295,13 @@ function SessionCheckin() {
 
             setMessage('Check-in successful! Welcome to the session.');
             setCheckinForm({ name: '', email: '', phone: '' });
+            setModalType('success');
+            setShowModal(true);
         } catch (error) {
             console.error('Error during check-in:', error);
+            setError(error.message || 'Check-in failed. Please try again.');
+            setModalType('error');
+            setShowModal(true);
             setMessage(error.message || 'Check-in failed. Please try again.');
         } finally {
             setCheckingIn(false);
@@ -407,6 +492,7 @@ function SessionCheckin() {
 
                 {session.isActive && (
                     <div className="checkin-section">
+                        <FeedbackModal />
                         {!isRegistered && !participant && (
                             <div className="registration-check">
                                 <h2>Check Registration</h2>

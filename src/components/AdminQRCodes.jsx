@@ -173,7 +173,7 @@ const AdminQRCodes = () => {
 			fetchQRCodes();
 		} catch (error) {
 			console.error('Error updating QR code:', error);
-		}
+		} 
 	};
 
 	const deleteQRCode = async (qrCodeId) => {

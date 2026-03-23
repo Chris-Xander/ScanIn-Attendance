@@ -291,6 +291,12 @@
     transition: all 0.2s ease;
 }
 
+.admin-db-status-btn {
+  background-color: #19a8b2;
+  color: #fff;
+  
+}
+
 .admin-db-open-btn:hover:not(:disabled),
 .admin-db-form button[type="submit"]:hover:not(:disabled) {
   background: linear-gradient(135deg, #1769aa 0%, #1565aa 100%);
