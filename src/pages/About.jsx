@@ -5,50 +5,25 @@ function About() {
     return (
         <div className="about-container">
             <div className="about-header">
-                <h1>About ScanIn (Attendid)</h1>
+                <h1>About KansoCheckin (Attendid)</h1>
                 <p>Comprehensive Guide to Getting Started and Using the Platform</p>
             </div>
 
             <div className="about-content">
                 <section>
-                    <h2>What is ScanIn?</h2>
-                    <p>ScanIn (also known as Attendid) is a comprehensive Progressive Web App (PWA) designed for modern attendance tracking. It provides organizations, schools, and event managers with powerful tools to manage attendance through QR code scanning, form-based submissions, and real-time analytics.</p>
-                    <p>Built with React and powered by Firebase, ScanIn offers a secure, scalable solution that works seamlessly across devices and platforms. Whether you're managing a classroom, conference, corporate event, or community gathering, ScanIn streamlines the entire attendance process.</p>
+                    <h2>What is KansoCheckin?</h2>
+                    <p>KansoCheckin (also known as Attendid) is a comprehensive Progressive Web App (PWA) designed for modern attendance tracking. It provides organizations, schools, and event managers with powerful tools to manage attendance through QR code scanning, form-based submissions, and real-time analytics.</p>
+                    <p>Built with React and powered by Firebase, KansoCheckin offers a secure, scalable solution that works seamlessly across devices and platforms. Whether you're managing a classroom, conference, corporate event, or community gathering, KansoCheckin streamlines the entire attendance process.</p>
                 </section>
 
-                <section>
                     <h2>Key Features</h2>
-                    <div className="feature-grid">
-                        <div className="feature-card">
-                            <h4>🔲 QR Code Management</h4>
-                            <p>Create unlimited custom QR codes for different events and sessions with advanced configuration options.</p>
-                        </div>
-                        <div className="feature-card">
-                            <h4>📊 Real-Time Analytics</h4>
-                            <p>Monitor attendance in real-time with live statistics, reports, and data visualization tools.</p>
-                        </div>
-                        <div className="feature-card">
-                            <h4>👥 Member Management</h4>
-                            <p>Register and manage participants with detailed profiles, roles, and attendance history.</p>
-                        </div>
-                        <div className="feature-card">
-                            <h4>📱 Cross-Platform</h4>
-                            <p>Works on any device with a modern web browser. Install as a PWA for native app experience.</p>
-                        </div>
-                        <div className="feature-card">
-                            <h4>🔒 Secure & Private</h4>
-                            <p>Enterprise-grade security with Firebase authentication and comprehensive data protection.</p>
-                        </div>
-                        <div className="feature-card">
-                            <h4>📈 Advanced Reporting</h4>
-                            <p>Generate detailed reports with export capabilities in multiple formats (Excel, CSV, PDF).</p>
-                        </div>
-                    </div>
-                </section>
+                    <section>
+                        <p>fuuuuh</p>
+                    </section>
 
                 <section>
                     <h2>Getting Started</h2>
-                    <p>ScanIn is designed to be intuitive and easy to use. Whether you're a first-time user or an experienced administrator, this guide will help you get up and running quickly.</p>
+                    <p>KansoCheckin is designed to be intuitive and easy to use. Whether you're a first-time user or an experienced administrator, this guide will help you get up and running quickly.</p>
 
                     <h3>System Requirements</h3>
                     <ul>
@@ -58,10 +33,10 @@ function About() {
                         <li><strong>Connection:</strong> Internet connection for real-time features</li>
                     </ul>
 
-                    <h3>Accessing ScanIn</h3>
-                    <p>You can access ScanIn through any modern web browser by visiting the application URL. For the best experience, we recommend using Google Chrome or Mozilla Firefox.</p>
+                    <h3>Accessing KansoCheckin</h3>
+                    <p>You can access KansoCheckin through any modern web browser by visiting the application URL. For the best experience, we recommend using Google Chrome or Mozilla Firefox.</p>
                     <div className="highlight-box">
-                        <strong>💡 Pro Tip:</strong> ScanIn works as a Progressive Web App (PWA), which means you can install it directly on your device for a native app-like experience. Look for the "Add to Home Screen" option in your browser menu.
+                        <strong>💡 Pro Tip:</strong> KansoCheckin works as a Progressive Web App (PWA), which means you can install it directly on your device for a native app-like experience. Look for the "Add to Home Screen" option in your browser menu.
                     </div>
                 </section>
 
@@ -78,7 +53,7 @@ function About() {
 
                     <h3>How to Create an Account</h3>
                     <ol>
-                        <li>Navigate to the ScanIn application in your web browser</li>
+                        <li>Navigate to the KansoCheckin application in your web browser</li>
                         <li>Click on the "Sign Up" or "Create Account" button</li>
                         <li>Fill in the required information:
                             <ul>
@@ -103,7 +78,7 @@ function About() {
 
                     <h3>Login Process</h3>
                     <ol>
-                        <li>Open ScanIn in your web browser</li>
+                        <li>Open KansoCheckin in your web browser</li>
                         <li>Click the "Login" or "Sign In" button</li>
                         <li>Enter your email address and password</li>
                         <li>Click "Login" to access your account</li>
@@ -123,11 +98,11 @@ function About() {
                 </section>
 
                 <section>
-                    <h2>Using ScanIn as a Member</h2>
+                    <h2>Using KansoCheckin as a Member</h2>
                     <p>Members can check in to events and view their attendance history. The best part? <strong>You don't need an account to check in!</strong></p>
 
                     <h3>Checking In Without an Account</h3>
-                    <p>ScanIn is designed for maximum accessibility. Anyone can check in to an event without creating an account:</p>
+                    <p>KansoCheckin is designed for maximum accessibility. Anyone can check in to an event without creating an account:</p>
 
                     <h4>Using Your Phone's Native Camera</h4>
                     <ol>
@@ -165,8 +140,8 @@ function About() {
                 </section>
 
                 <section>
-                    <h2>Using ScanIn as an Administrator</h2>
-                    <p>Administrators have full control over the ScanIn platform. This section provides a comprehensive guide to all administrative features and functions.</p>
+                    <h2>Using KansoCheckin as an Administrator</h2>
+                    <p>Administrators have full control over the KansoCheckin platform. This section provides a comprehensive guide to all administrative features and functions.</p>
 
                     <h3>Admin Dashboard Overview</h3>
                     <p>The admin dashboard is your central hub for managing all aspects of attendance tracking. It includes:</p>
@@ -178,7 +153,7 @@ function About() {
                     </ul>
 
                     <h3>Creating Regular QR Codes</h3>
-                    <p>QR codes are the foundation of ScanIn's attendance system. Learn how to create and manage them effectively.</p>
+                    <p>QR codes are the foundation of KansoCheckin's attendance system. Learn how to create and manage them effectively.</p>
 
                     <h4>Types of QR Codes</h4>
                     <ul>
@@ -247,7 +222,7 @@ function About() {
                     <p>Member management is crucial for organizations that need to track specific individuals or groups.</p>
 
                     <h4>Registering Members</h4>
-                    <p>There are several ways to add members to your ScanIn system:</p>
+                    <p>There are several ways to add members to your KansoCheckin system:</p>
 
                     <h4>Manual Registration</h4>
                     <ol>
@@ -271,7 +246,7 @@ function About() {
                         <li>Prepare a CSV file with member data</li>
                         <li>Go to "Members" → "Import Members"</li>
                         <li>Upload your CSV file</li>
-                        <li>Map columns to ScanIn fields</li>
+                        <li>Map columns to KansoCheckin fields</li>
                         <li>Review and confirm the import</li>
                     </ol>
 
@@ -286,7 +261,7 @@ function About() {
                     </ul>
 
                     <h3>Viewing Reports and Analytics</h3>
-                    <p>ScanIn provides comprehensive reporting tools to help you understand attendance patterns and make data-driven decisions.</p>
+                    <p>KansoCheckin provides comprehensive reporting tools to help you understand attendance patterns and make data-driven decisions.</p>
 
                     <h4>Types of Reports</h4>
                     <ul>
@@ -323,7 +298,7 @@ function About() {
                     </ul>
 
                     <h3>Exporting Data</h3>
-                    <p>ScanIn makes it easy to export your attendance data for external analysis, record-keeping, or integration with other systems.</p>
+                    <p>KansoCheckin makes it easy to export your attendance data for external analysis, record-keeping, or integration with other systems.</p>
 
                     <h4>Export Options</h4>
                     <ul>
@@ -354,7 +329,7 @@ function About() {
 
                 <section>
                     <h2>Security and Privacy</h2>
-                    <p>ScanIn takes security and privacy seriously. All data is encrypted in transit and at rest, and we follow industry best practices for data protection.</p>
+                    <p>KansoCheckin takes security and privacy seriously. All data is encrypted in transit and at rest, and we follow industry best practices for data protection.</p>
 
                     <h3>Data Protection</h3>
                     <ul>
@@ -365,34 +340,34 @@ function About() {
                     </ul>
 
                     <h3>Compliance</h3>
-                    <p>ScanIn complies with major data protection regulations and implements privacy-by-design principles.</p>
+                    <p>KansoCheckin complies with major data protection regulations and implements privacy-by-design principles.</p>
                 </section>
 
                 <section>
                     <h2>Getting Help and Support</h2>
-                    <p>Need assistance? ScanIn provides multiple ways to get help:</p>
+                    <p>Need assistance? KansoCheckin provides multiple ways to get help:</p>
 
                     <h3>Documentation</h3>
                     <ul>
                         <li><strong>User Guides:</strong> Step-by-step instructions for all features</li>
                         <li><strong>Video Tutorials:</strong> Visual guides for complex tasks</li>
                         <li><strong>FAQ:</strong> Answers to common questions</li>
-                        <li><strong>API Documentation:</strong> For developers integrating with ScanIn</li>
+                        <li><strong>API Documentation:</strong> For developers integrating with KansoCheckin</li>
                     </ul>
 
                     <h3>Support Options</h3>
                     <ul>
                         <li><strong>Email Support:</strong> Contact our support team</li>
                         <li><strong>Live Chat:</strong> Real-time assistance during business hours</li>
-                        <li><strong>Community Forum:</strong> Connect with other ScanIn users</li>
+                        <li><strong>Community Forum:</strong> Connect with other KansoCheckin users</li>
                         <li><strong>Priority Support:</strong> Premium support for enterprise customers</li>
                     </ul>
                 </section>
 
                 <section>
                     <h2>Conclusion</h2>
-                    <p>ScanIn is more than just an attendance tracking app—it's a comprehensive solution designed to make attendance management efficient, accurate, and insightful. Whether you're managing a small classroom or a large corporate event, ScanIn provides the tools you need to succeed.</p>
-                    <p>Thank you for choosing ScanIn. We're committed to continuously improving our platform and supporting your attendance tracking needs.</p>
+                    <p>KansoCheckin is more than just an attendance tracking app—it's a comprehensive solution designed to make attendance management efficient, accurate, and insightful. Whether you're managing a small classroom or a large corporate event, KansoCheckin provides the tools you need to succeed.</p>
+                    <p>Thank you for choosing KansoCheckin. We're committed to continuously improving our platform and supporting your attendance tracking needs.</p>
                 </section>
             </div>
         </div>

@@ -29,7 +29,7 @@ const AdminQRCodes = () => {
 	const [qrCodes, setQrCodes] = useState([]);
 	const [showQRModal, setShowQRModal] = useState(false);
 	const [selectedQR, setSelectedQR] = useState(null);
-	const PRODUCTION_BASE_URL = 'https://Chris-Xander.github.io/ScanIn-Attendance';
+	const BASE_URL = window.location.origin + (import.meta.env.BASE_URL || '/');
 	const [fetching, setFetching] = useState(false); // for read/list skeleton
 	const [submitting, setSubmitting] = useState(false); // for create/update submissions
 	const [formData, setFormData] = useState({
@@ -389,10 +389,10 @@ const AdminQRCodes = () => {
 						</div>
 						<div className="qr-modal-body">
 							<div className="qr-code-display">
-								<QRCode value={`${PRODUCTION_BASE_URL}/scan-form/${selectedQR.qrId}`} size={200} />
-							</div>
-							<div className="qr-details">
-								<p><strong>URL:</strong> <a href={`${PRODUCTION_BASE_URL}/scan-form/${selectedQR.qrId}`} target="_blank" rel="noopener noreferrer">{`${PRODUCTION_BASE_URL}/scan-form/${selectedQR.qrId}`}</a></p>
+							<QRCode value={`${BASE_URL}scan-form/${selectedQR.qrId}`} size={200} />
+						</div>
+						<div className="qr-details">
+							<p><strong>URL:</strong> <a href={`${BASE_URL}scan-form/${selectedQR.qrId}`} target="_blank" rel="noopener noreferrer">{`${BASE_URL}scan-form/${selectedQR.qrId}`}</a></p>
 								<p><strong>Description:</strong> {selectedQR.description}</p>
 								<p><strong>Location:</strong> {selectedQR.location}</p>
 								<p><strong>Event Type:</strong> {selectedQR.eventType}</p>

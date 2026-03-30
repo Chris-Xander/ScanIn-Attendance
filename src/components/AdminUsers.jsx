@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase/config';
 import { writeBatch, collection, addDoc, getDocs, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs as getAllDocs } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
@@ -10,6 +11,7 @@ import './AdminUsers.css';
 
 function AdminUsers() {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('members');
     const [members, setMembers] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -153,10 +155,7 @@ function AdminUsers() {
     // Delete confirmation modal state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [sessionToDelete, setSessionToDelete] = useState(null);
-    // const [expandedSessions, setExpandedSessions] = useState({}); // REMOVED
-    const [sessionParticipants, setSessionParticipants] = useState({});
     const [allSessionParticipants, setAllSessionParticipants] = useState({});
-    const [allSessions, setAllSessions] = useState([]);
     const [editingParticipantId, setEditingParticipantId] = useState(null);
     const [editFormData, setEditFormData] = useState({ email: '', phone: '' });
     const [showRemoveModal, setShowRemoveModal] = useState(false);
@@ -164,6 +163,12 @@ function AdminUsers() {
     // NEW: Participants table modal state
     const [showParticipantsModal, setShowParticipantsModal] = useState(false);
     const [selectedSessionForModal, setSelectedSessionForModal] = useState(null);
+    const [participantsSearchOpen, setParticipantsSearchOpen] = useState(false);
+    const [participantsSearchQuery, setParticipantsSearchQuery] = useState('');
+    const [participantSearchMatchCount, setParticipantSearchMatchCount] = useState(0);
+    const [participantHighlightedIds, setParticipantHighlightedIds] = useState([]);
+    const participantRowRefs = useRef({});
+    const participantHighlightTimeoutRef = useRef(null);
 
     useEffect(() => {
         if (activeTab === 'members') {
@@ -442,6 +447,80 @@ function AdminUsers() {
     const closeParticipantsModal = () => {
         setShowParticipantsModal(false);
         setSelectedSessionForModal(null);
+        setParticipantsSearchOpen(false);
+        setParticipantsSearchQuery('');
+        setParticipantSearchMatchCount(0);
+        setParticipantHighlightedIds([]);
+        participantRowRefs.current = {};
+
+        if (participantHighlightTimeoutRef.current) {
+            clearTimeout(participantHighlightTimeoutRef.current);
+            participantHighlightTimeoutRef.current = null;
+        }
+    };
+
+    const highlightSearchText = (value, searchTerm) => {
+        const text = String(value ?? '—');
+        const trimmedSearch = searchTerm.trim();
+
+        if (!trimmedSearch) {
+            return text;
+        }
+
+        const safeSearch = trimmedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = text.split(new RegExp(`(${safeSearch})`, 'ig'));
+
+        return parts.map((part, index) =>
+            part.toLowerCase() === trimmedSearch.toLowerCase() ? (
+                <mark key={`${part}-${index}`} className="search-highlight-mark">{part}</mark>
+            ) : (
+                <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>
+            )
+        );
+    };
+
+    const clearParticipantsSearch = () => {
+        setParticipantsSearchQuery('');
+        setParticipantSearchMatchCount(0);
+        setParticipantHighlightedIds([]);
+    };
+
+    const handleParticipantsSearch = () => {
+        const trimmedQuery = participantsSearchQuery.trim().toLowerCase();
+        const sessionParticipants = allSessionParticipants[selectedSessionForModal?.id] || [];
+
+        if (!trimmedQuery) {
+            clearParticipantsSearch();
+            return;
+        }
+
+        const matches = sessionParticipants.filter(participant =>
+            [participant.name, participant.email, participant.phone].some(value =>
+                String(value || '').toLowerCase().includes(trimmedQuery)
+            )
+        );
+
+        const matchIds = matches.map(participant => participant.id);
+        setParticipantSearchMatchCount(matchIds.length);
+        setParticipantHighlightedIds(matchIds);
+
+        if (participantHighlightTimeoutRef.current) {
+            clearTimeout(participantHighlightTimeoutRef.current);
+        }
+
+        if (matchIds.length === 0) {
+            alert(`No participants found for "${participantsSearchQuery}".`);
+            return;
+        }
+
+        const firstMatchRow = participantRowRefs.current[matchIds[0]];
+        if (firstMatchRow) {
+            firstMatchRow.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+        }
+
+        participantHighlightTimeoutRef.current = setTimeout(() => {
+            setParticipantHighlightedIds([]);
+        }, 4000);
     };
 
     // REMOVED: unused standalone updateIdentifier - now computed inline in handleEditParticipant
@@ -1023,12 +1102,8 @@ function AdminUsers() {
             <h2>Session Dashboard</h2>
             <p>Real-time monitoring of session attendance.</p>
 
-            {/* Attendance Stats */}
+            {/* Stats Cards */}
             <div className="user-stats-row">
-                <div className="user-stat-card">
-                    <h3>Total Sessions</h3>
-                    <p>{sessions.length}</p>
-                </div>
                 <div className="user-stat-card">
                     <h3>Active Sessions</h3>
                     <p>{sessions.filter(s => s.isActive).length}</p>
@@ -1038,6 +1113,10 @@ function AdminUsers() {
                     <p>{attendanceLogs.filter(log =>
                         new Date(log.checkInTime?.toDate()).toDateString() === new Date().toDateString()
                     ).length}</p>
+                </div>
+                <div className="user-stat-card">
+                    <h3>Total Sessions</h3>
+                    <p>{sessions.length}</p>
                 </div>
             </div>
         </>
@@ -1055,9 +1134,54 @@ function AdminUsers() {
                         <h2>{selectedSessionForModal.name} - All Participants ({sessionParticipants.length})</h2>
                         <button className="qr-modal-close" onClick={closeParticipantsModal}>×</button>
                     </div>
-                    <div className="qr-modal-body" style={{overflow: 'auto'}}>
-                        <div style={{overflowX: 'auto'}}>
-                            <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '14px'}}>
+                    <div className="qr-modal-body participants-modal-body" style={{ overflowX: 'auto', overflowY: 'auto' }}>
+                        <div className="participants-search-toolbar">
+                            <button
+                                type="button"
+                                className="participants-search-icon-btn"
+                                onClick={() => setParticipantsSearchOpen(prev => !prev)}
+                                title="Search participants"
+                                aria-label="Search participants"
+                            >
+                                <svg viewBox="0 0 20 20" aria-hidden="true" className="search-icon-svg">
+                                    <circle cx="8.5" cy="8.5" r="4.75" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                                    <path d="M12 12l4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                </svg>
+                            </button>
+                            <p>search</p>
+
+                            {participantsSearchOpen && (
+                                <div className="participants-search-controls">
+                                    <input
+                                        type="text"
+                                        value={participantsSearchQuery}
+                                        onChange={(e) => setParticipantsSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleParticipantsSearch();
+                                            }
+                                        }}
+                                        className="participants-search-input"
+                                        placeholder="Search by name, email, or phone"
+                                    />
+                                    <button type="button" className="admin-db-open-btn" onClick={handleParticipantsSearch}>
+                                        Search
+                                    </button>
+                                    <button type="button" className="admin-db-delete-btn" onClick={clearParticipantsSearch}>
+                                        Clear
+                                    </button>
+                                    {participantsSearchQuery.trim() && (
+                                        <span className="participants-search-status">
+                                            {participantSearchMatchCount} match{participantSearchMatchCount === 1 ? '' : 'es'}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="participants-horizontal-scroll">
+                            <table className="participants-modal-table" style={{ borderCollapse: 'collapse', fontSize: '14px' }}>
                                 <thead>
                                     <tr style={{backgroundColor: '#f5f5f5'}}>
                                         <th style={{padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold'}}>Name</th>
@@ -1068,8 +1192,17 @@ function AdminUsers() {
                                 </thead>
                                 <tbody>
                                     {sessionParticipants.map(participant => (
-                                        <tr key={participant.id} style={{borderBottom: '1px solid #eee'}}>
-                                            <td style={{padding: '12px 8px', fontWeight: '500'}}>{participant.name}</td>
+                                        <tr
+                                            key={participant.id}
+                                            ref={(el) => {
+                                                if (el) {
+                                                    participantRowRefs.current[participant.id] = el;
+                                                }
+                                            }}
+                                            className={participantHighlightedIds.includes(participant.id) ? 'participant-search-match' : ''}
+                                            style={{borderBottom: '1px solid #eee'}}
+                                        >
+                                            <td style={{padding: '12px 8px', fontWeight: '500'}}>{highlightSearchText(participant.name || '—', participantsSearchQuery)}</td>
                                             <td style={{padding: '12px 8px'}}>{editingParticipantId === participant.id ? (
                                                 <input
                                                     type="email"
@@ -1078,7 +1211,7 @@ function AdminUsers() {
                                                     style={{width: '100%', padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px'}}
                                                     placeholder="Email"
                                                 />
-                                            ) : participant.email || '—'}</td>
+                                            ) : highlightSearchText(participant.email || '—', participantsSearchQuery)}</td>
                                             <td style={{padding: '12px 8px'}}>{editingParticipantId === participant.id ? (
                                                 <input
                                                     type="text"
@@ -1087,7 +1220,7 @@ function AdminUsers() {
                                                     style={{width: '100%', padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px'}}
                                                     placeholder="Phone"
                                                 />
-                                            ) : participant.phone || '—'}</td>
+                                            ) : highlightSearchText(participant.phone || '—', participantsSearchQuery)}</td>
                                             <td style={{padding: '12px 8px', textAlign: 'center'}}>
                                                 {editingParticipantId === participant.id ? (
                                                     <>

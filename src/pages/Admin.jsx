@@ -12,7 +12,7 @@ import '../components/ResponsiveNavbar.css';
 const adminNavItems = [
     { key: 'dashboard', label: 'Dashboard', icon: '📊' },
     { key: 'qrcodes', label: 'QR Codes', icon: '📱' },
-    { key: 'users', label: 'User Control', icon: '👥' },
+    { key: 'users', label: 'Session Control', icon: '👥' },
     { key: 'reports', label: 'Gate Report', icon: '📋' },
 ];
 

@@ -4,7 +4,7 @@ import '../App.css';
 import '../page_styles/landing.css';
 import qrIllustration from '../assets/illustrations/vecteezy_qr-code-scanning-vector-illustration-concept-suitable-for_7278490.jpg';
 import qrcodeicon from '../assets/Icons/qr-code.png';
-import Logo from '../assets/Icons/signinLogo2.png';
+import Logo from '../assets/Icons/KansoCheckinLogo.png';
 import Motioncheckmark from '../assets/Icons/icons8-verified-badge.gif';
 import AnalyticImage from '../assets/illustrations/undraw_dev-environment_n5by.svg';
 import AttendanceGif from '../assets/Icons/candidate_10051272.gif';
@@ -51,8 +51,8 @@ function Landing() {
         <img ref={illustrationRef} src={qrIllustration} alt="QR Code Scanning" className={`landing-illustration ${animateIllustration ? 'animate-from-bottom' : 'default-visible'}`} />
         <div className="landing-hero-content">
           <h2>Welcome to KansoCheckin Attendance Tracking</h2>
-          <p>Modern, secure, and easy-to-use attendance management for organizations, schools, and events. Scan, track, and manage attendance in real time with our App today!</p>
-          <p>Click the button below to get started or scan your attendance!</p>
+          <p>Modern and easy-to-use attendance management for organizations, schools, and events. Create an account as an Admin to create and Manage Attendance Sessions or As a Member to scan and record attendance! Scan, track, and manage attendance in real time with our App today!</p>
+          <p>Click the button below to get started and record your attendance!</p>
           <div className="landing-btn-container">
            <button className="landing-btn" onClick={() => navigate('/login')}>Get Started</button>
            <button className="landing-btn-scan" onClick={() => navigate('/about')}>Learn More!</button>

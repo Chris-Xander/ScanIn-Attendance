@@ -41,7 +41,85 @@
 .attendance-modal-body {
   overflow: auto;
   flex: 1 1 auto;
+  margin-top: 20px;
   -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+}
+
+.attendance-search-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 12px 12px 0;
+  flex-wrap: wrap;
+}
+
+.attendance-search-icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid #cfe2f6;
+  border-radius: 8px;
+  background: #fff;
+  color: #1976d2;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.attendance-search-icon-btn:hover {
+  background: #f5f9ff;
+  border-color: #1976d2;
+}
+
+.attendance-search-icon-btn .search-icon-svg {
+  width: 15px;
+  height: 15px;
+}
+
+.attendance-search-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.attendance-search-input {
+  flex: 1 1 240px;
+  min-width: 220px;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #cfe2f6;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.attendance-search-btn,
+.attendance-clear-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 2px 8px;
+  min-height: 28px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.attendance-search-btn {
+  background: #1976d2;
+  color: #fff;
+}
+
+.attendance-clear-btn {
+  background: #eceff1;
+  color: #334;
+}
+
+.attendance-search-status {
+  color: #1976d2;
+  font-weight: 700;
+  font-size: 0.9rem;
 }
 
 .close-btn {
@@ -121,6 +199,18 @@
   z-index: 4; /* higher z-index for name header in sticky overlap */
 }
 
+.attendance-search-match td {
+  background: #fff8c4;
+  box-shadow: inset 0 0 0 1px #ffd54f;
+}
+
+.attendance-search-mark {
+  background: #ffe082;
+  color: #333;
+  padding: 0 0.18rem;
+  border-radius: 4px;
+}
+
 .cell.present {
   background: #e6ffed;
   color: #08361a;
@@ -188,6 +278,19 @@
 
   .attendance-modal-body {
     padding: 8px;
+  }
+
+  .attendance-search-toolbar {
+    padding: 8px 8px 0;
+  }
+
+  .attendance-search-controls {
+    width: 100%;
+  }
+
+  .attendance-search-input {
+    min-width: 0;
+    width: 100%;
   }
 
   .attendance-grid {

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import './ResponsiveNavbar.css';
-import Logo from '../assets/Icons/signinLogo2.png';
+import Logo from '../assets/Icons/KansoCheckinLogo.png';
 import {auth} from '../firebase/config';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 
 
-const ResponsiveNavbar = ({ activeSection, onNavClick, logoText = 'Admin Panel', navItems = [], userDisplay = 'User', logoutLink }) => {
+const ResponsiveNavbar = ({ activeSection, onNavClick, logoText = 'Admin Panel', navItems = [], logoutLink }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const navigate = useNavigate();
@@ -77,7 +77,6 @@ const ResponsiveNavbar = ({ activeSection, onNavClick, logoText = 'Admin Panel',
                 </div>
 
                 <div className="login-section desktop-login">
-                    <span className="user-email">{userDisplay}</span>
                     <button className='logout-button' onClick={openLogoutModal}>Logout</button>
                 </div>
 

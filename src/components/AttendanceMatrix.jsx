@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import './AttendanceMatrix.css';
@@ -11,6 +11,12 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
     const [selectedRow, setSelectedRow] = useState(null);
     const [selectedMemberDetails, setSelectedMemberDetails] = useState(null);
     const [detailsLoading, setDetailsLoading] = useState(false);
+    const [showSearch, setShowSearch] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchMatchCount, setSearchMatchCount] = useState(0);
+    const [highlightedRowIds, setHighlightedRowIds] = useState([]);
+    const rowRefs = useRef({});
+    const searchHighlightTimeoutRef = useRef(null);
 
     const formatDateWithDay = (dateStr) => {
         // dateStr format: YYYY-MM-DD
@@ -61,6 +67,69 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
         } finally {
             setDetailsLoading(false);
         }
+    };
+
+    const highlightSearchText = (value, term) => {
+        const text = String(value ?? '—');
+        const trimmedTerm = term.trim();
+
+        if (!trimmedTerm) {
+            return text;
+        }
+
+        const safeTerm = trimmedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = text.split(new RegExp(`(${safeTerm})`, 'ig'));
+
+        return parts.map((part, index) =>
+            part.toLowerCase() === trimmedTerm.toLowerCase() ? (
+                <mark key={`${part}-${index}`} className="attendance-search-mark">{part}</mark>
+            ) : (
+                <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>
+            )
+        );
+    };
+
+    const clearMatrixSearch = () => {
+        setSearchQuery('');
+        setSearchMatchCount(0);
+        setHighlightedRowIds([]);
+    };
+
+    const handleMatrixSearch = () => {
+        const trimmedQuery = searchQuery.trim().toLowerCase();
+
+        if (!trimmedQuery) {
+            clearMatrixSearch();
+            return;
+        }
+
+        const matches = matrix.filter(row =>
+            [row.name, row.email, row.phone].some(value =>
+                String(value || '').toLowerCase().includes(trimmedQuery)
+            )
+        );
+
+        const matchIds = matches.map(row => row.id);
+        setSearchMatchCount(matchIds.length);
+        setHighlightedRowIds(matchIds);
+
+        if (searchHighlightTimeoutRef.current) {
+            clearTimeout(searchHighlightTimeoutRef.current);
+        }
+
+        if (matchIds.length === 0) {
+            alert(`No matching attendance rows found for "${searchQuery}".`);
+            return;
+        }
+
+        const firstMatchRow = rowRefs.current[matchIds[0]];
+        if (firstMatchRow) {
+            firstMatchRow.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        }
+
+        searchHighlightTimeoutRef.current = setTimeout(() => {
+            setHighlightedRowIds([]);
+        }, 4000);
     };
 
     const buildMatrix = async () => {
@@ -177,6 +246,46 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                     <button className="close-btn" onClick={onClose}>Close</button>
                 </div>
                 <div className="attendance-modal-body">
+                    <div className="attendance-search-toolbar">
+                        <button
+                            type="button"
+                            className="attendance-search-icon-btn"
+                            onClick={() => setShowSearch(prev => !prev)}
+                            title="Search attendance data"
+                            aria-label="Search attendance data"
+                        >
+                            <svg viewBox="0 0 20 20" aria-hidden="true" className="search-icon-svg">
+                                <circle cx="8.5" cy="8.5" r="4.75" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                                <path d="M12 12l4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                        </button>
+
+                        {showSearch && (
+                            <div className="attendance-search-controls">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleMatrixSearch();
+                                        }
+                                    }}
+                                    className="attendance-search-input"
+                                    placeholder="Search by name, email, or phone"
+                                />
+                                <button type="button" className="attendance-search-btn" onClick={handleMatrixSearch}>Search</button>
+                                <button type="button" className="attendance-clear-btn" onClick={clearMatrixSearch}>Clear</button>
+                                {searchQuery.trim() && (
+                                    <span className="attendance-search-status">
+                                        {searchMatchCount} match{searchMatchCount === 1 ? '' : 'es'}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
                     {loading ? (
                         <div className="loading">Loading attendance...</div>
                     ) : matrix.length === 0 ? (
@@ -193,12 +302,20 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                                             <th key={d}>{formatDateWithDay(d)}</th>
                                         ))}
                                     </tr>
-                                </thead>;
+                                </thead>
                                 <tbody>
                                     {matrix.map((row, idx) => (
-                                        <tr key={row.id}>
+                                        <tr
+                                            key={row.id}
+                                            ref={(el) => {
+                                                if (el) {
+                                                    rowRefs.current[row.id] = el;
+                                                }
+                                            }}
+                                            className={highlightedRowIds.includes(row.id) ? 'attendance-search-match' : ''}
+                                        >
                                             <td>{idx + 1}</td>
-                                            <td className="name-col" onClick={() => setSelectedRow(row)} style={{ cursor: 'pointer' }} title="View details">{row.name}</td>
+                                            <td className="name-col" onClick={() => setSelectedRow(row)} style={{ cursor: 'pointer' }} title="View details">{highlightSearchText(row.name, searchQuery)}</td>
                                             {days.map(day => {
                                                 const cell = row.days[day];
                                                 return (

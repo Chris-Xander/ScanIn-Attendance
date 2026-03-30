@@ -158,14 +158,19 @@
 
 .about-content .feature-grid {
   display: grid;
-  background-color: #444;
+  background-color: #ffffff;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
   margin: 1.5rem 0;
 }
 
-.about-content .feature-card {
-  background: #f8f9fa;
+.feature-grid h4 {
+  color: #555;
+  line-height: 1.5;
+}
+
+.about-content {
+  background: #ffffff;
   padding: 1.5rem;
   border-radius: 8px;
   border: 1px solid #e9ecef;
