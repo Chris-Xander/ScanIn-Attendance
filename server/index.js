@@ -2,9 +2,11 @@
 import express from 'express';
 import cors from 'cors';
 import admin from 'firebase-admin';
-const {default: serviceAccount} = await import('./serviceAccountKey.json', { assert: { type: 'json' } });
 
+require('dotenv').config();
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 const app = express();
+
 const PORT = 4000;
 
 // Initialize Firebase Admin SDK
