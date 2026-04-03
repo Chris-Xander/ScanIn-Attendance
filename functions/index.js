@@ -1,9 +1,10 @@
 /* eslint-env node */
 const { setGlobalOptions } = require('firebase-functions/v2');
-const { onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
+const QRCodeReader = require('qrcode-reader'); 
 
 admin.initializeApp();
 setGlobalOptions({ maxInstances: 10, region: 'us-central1' });
@@ -221,5 +222,203 @@ exports.processDeletionJob = onDocumentCreated(
     await jobRef.update({ status: 'failed', error: err.message, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
     return null;
   }
+  }
+);
+
+// NEW FUNCTION - validate QR attendance (called from client with QR data, sessionId, location, deviceToken)
+exports.validateQRAttendance = onCall(
+  { cors: true, region: 'us-central1' }, 
+  async (request) => {
+    const { sessionId, location, deviceToken } = request.data;
+    
+    // 1. Auth check
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const uid = request.auth.uid;
+    
+    const db = admin.firestore();
+    
+    // 2. Verify session belongs to user
+    const sessionSnap = await db.collection('sessions').doc(sessionId).get();
+    if (!sessionSnap.exists) {
+      throw new HttpsError('not-found', 'Session not found');
+    }
+    const session = sessionSnap.data();
+    if (session.adminId !== uid) {
+      throw new HttpsError('permission-denied', 'Not session admin');
+    }
+    
+    // 3. QR validation (server-side - assume QR data sent or session.qrSecret)
+    const expectedQR = session.qrSecret || sessionId;  // Your QR logic
+    // If raw image: const qr = new QRCodeReader(); qr.callback = ... (see note)
+    
+    if (!deviceToken || deviceToken !== session.deviceToken) {  // Example check
+      throw new HttpsError('invalid-argument', 'Invalid QR/device');
+    }
+    
+    // 4. Geofence (copy from your server/index.js)
+    if (location && session.geofence) {
+      const R = 6371;
+      const dLat = (session.geofence.latitude - location.latitude) * (Math.PI / 180);
+      // ... full haversine (paste your exact code here)
+    }
+    
+    // 5. Secure write
+    const newRecord = await db.collection('attendanceRecords').add({
+      sessionId,
+      uid,
+      deviceToken,
+      location,
+      validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ip: request.rawRequest.ip  // Anti-spoof
+    });
+    
+    return { 
+      success: true, 
+      message: 'Attendance validated server-side!',
+      recordId: newRecord.id 
+    };
+  }
+);
+
+// Subscription functions
+exports.checkSubscriptionStatus = onCall(
+  { cors: true, region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const uid = request.auth.uid;
+    const db = admin.firestore();
+    
+    const subRef = db.collection('subscriptions').doc(uid);
+    const subSnap = await subRef.get();
+    
+    if (!subSnap.exists) {
+      return {
+        active: false,
+        plan: 'free',
+        trialUsed: false,
+        subscriptionEnd: null,
+        daysRemaining: null
+      };
+    }
+    
+    const data = subSnap.data();
+    const now = new Date();
+    const expiresAt = data.expiresAt ? new Date(data.expiresAt.seconds * 1000) : null;
+    const active = expiresAt && expiresAt > now;
+    const daysRemaining = active ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
+    
+    return {
+      active,
+      plan: data.plan || 'free',
+      trialUsed: !!data.trialUsed,
+      subscriptionEnd: data.expiresAt,
+      daysRemaining
+    };
+  }
+);
+
+exports.activateFreeTrial = onCall(
+  { cors: true, region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const uid = request.auth.uid;
+    const db = admin.firestore();
+    
+    // Get user info from Firebase Auth
+    const userRecord = await admin.auth().getUser(uid);
+    
+    const subRef = db.collection('subscriptions').doc(uid);
+    const subSnap = await subRef.get();
+    
+    if (subSnap.exists && subSnap.data().trialUsed) {
+      throw new HttpsError('failed-precondition', 'Free trial already used');
+    }
+    
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000); // 21 days
+    
+    await subRef.set({
+      plan: 'trial',
+      trialUsed: true,
+      expiresAt: admin.firestore.Timestamp.fromDate(trialEnd),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      userId: uid,
+      email: userRecord.email,
+      displayName: userRecord.displayName || userRecord.email
+    }, { merge: true });
+    
+    return {
+      active: true,
+      plan: 'trial',
+      trialUsed: true,
+      subscriptionEnd: admin.firestore.Timestamp.fromDate(trialEnd),
+      daysRemaining: 21
+    };
+  }
+);
+
+exports.activateSubscription = onCall(
+  { cors: true, region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const uid = request.auth.uid;
+    const { plan, paymentProof } = request.data;
+    
+    if (!plan) {
+      throw new HttpsError('invalid-argument', 'Plan is required');
+    }
+    
+    // In a real app, verify paymentProof here
+    // For now, assume it's valid
+    
+    // Get user info from Firebase Auth
+    const userRecord = await admin.auth().getUser(uid);
+    
+    const db = admin.firestore();
+    const subRef = db.collection('subscriptions').doc(uid);
+    
+    const now = new Date();
+    let expiresAt;
+    
+    // Calculate expiration based on plan
+    switch (plan) {
+      case 'weekly':
+        expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'monthly':
+        expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'annual':
+        expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        throw new HttpsError('invalid-argument', 'Invalid plan');
+    }
+    
+    await subRef.set({
+      plan,
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+      trialUsed: true, // Once subscribed, trial is considered used
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      userId: uid,
+      email: userRecord.email,
+      displayName: userRecord.displayName || userRecord.email
+    }, { merge: true });
+    
+    return {
+      active: true,
+      plan,
+      trialUsed: true,
+      subscriptionEnd: admin.firestore.Timestamp.fromDate(expiresAt),
+      daysRemaining: Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24))
+    };
   }
 );

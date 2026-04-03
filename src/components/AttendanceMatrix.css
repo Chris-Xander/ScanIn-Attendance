@@ -183,9 +183,22 @@
   text-overflow: ellipsis;
 }
 
+/* Attendance summary column */
+.attendance-grid th.summary-col,
+.attendance-grid td.summary-col {
+  min-width: 110px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.attendance-grid tbody td.summary-col {
+  background: #f5f9ff;
+  color: #1565c0;
+}
+
 /* Date columns */
-.attendance-grid th:nth-child(n+3),
-.attendance-grid td:nth-child(n+3) {
+.attendance-grid th:nth-child(n+4),
+.attendance-grid td:nth-child(n+4) {
   min-width: 110px;
 }
 
@@ -315,8 +328,13 @@
     left: 40px;
   }
 
-  .attendance-grid th:nth-child(n+3),
-  .attendance-grid td:nth-child(n+3) {
+  .attendance-grid th:nth-child(3),
+  .attendance-grid td:nth-child(3) {
+    min-width: 95px;
+  }
+
+  .attendance-grid th:nth-child(n+4),
+  .attendance-grid td:nth-child(n+4) {
     min-width: 100px;
   }
 
@@ -384,8 +402,13 @@
     left: 35px;
   }
 
-  .attendance-grid th:nth-child(n+3),
-  .attendance-grid td:nth-child(n+3) {
+  .attendance-grid th:nth-child(3),
+  .attendance-grid td:nth-child(3) {
+    min-width: 88px;
+  }
+
+  .attendance-grid th:nth-child(n+4),
+  .attendance-grid td:nth-child(n+4) {
     min-width: 90px;
   }
 

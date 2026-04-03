@@ -298,7 +298,7 @@ function DataRetentionPolicy() {
                 <section>
                     <h2>Contact Information</h2>
                     <p>If you have questions about this Data Retention Policy, our data retention practices, or need to request data deletion:</p>
-                    <p><strong>Email:</strong> [Insert Contact Email]</p>
+                    <p><strong>Email:</strong>kansocheckin@gmail.com</p>
                     <p><strong>Service Name:</strong> KansoCheckin (Attendid)</p>
                     <p><strong>Response Time:</strong> We aim to respond to data retention inquiries within 30 days.</p>
                     <p>For urgent data deletion requests or privacy concerns, please contact us immediately.</p>

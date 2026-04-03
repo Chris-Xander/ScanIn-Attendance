@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/config';
-import { collection, getDocs, doc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, getDoc, getDocs, doc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import './AdminReports.css';
 import AttendanceMatrix from './AttendanceMatrix';
@@ -30,9 +30,58 @@ function AdminReports() {
     const [showMatrix, setShowMatrix] = useState(false);
     const [matrixMode, setMatrixMode] = useState(null);
     const [matrixTargetId, setMatrixTargetId] = useState(null);
-    
 
+    const toDateObj = (value) => {
+        if (!value) return null;
+        if (value instanceof Date) return value;
+        if (typeof value === 'string') return new Date(value);
+        if (typeof value?.toDate === 'function') return value.toDate();
 
+        try {
+            return new Date(value);
+        } catch {
+            return null;
+        }
+    };
+
+    const toDateKey = (value) => {
+        if (!value) return null;
+
+        if (typeof value === 'string') {
+            const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (match) return match[1];
+        }
+
+        const date = toDateObj(value);
+        if (!date || Number.isNaN(date.getTime())) return null;
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const buildDateRange = (startValue, endValue) => {
+        const startKey = toDateKey(startValue);
+        const endKey = toDateKey(endValue);
+
+        if (!startKey || !endKey) return [];
+
+        const cursor = new Date(`${startKey}T00:00:00`);
+        const end = new Date(`${endKey}T00:00:00`);
+
+        if (Number.isNaN(cursor.getTime()) || Number.isNaN(end.getTime()) || end < cursor) {
+            return [];
+        }
+
+        const range = [];
+        while (cursor <= end) {
+            range.push(toDateKey(cursor));
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        return range;
+    };
 
     const downloadQRDataAsExcel = async (qrCodeId, qrName) => {
         try {
@@ -169,12 +218,18 @@ function AdminReports() {
         try {
             const attendanceRef = collection(db, 'attendanceRecords');
             const q = query(attendanceRef, where('sessionId', '==', sessionId));
-            const snapshot = await getDocs(q);
-            
+            const [snapshot, sessionSnap] = await Promise.all([
+                getDocs(q),
+                getDoc(doc(db, 'sessions', sessionId))
+            ]);
+
             if (snapshot.empty) {
                 alert('No attendance records found for this session');
                 return;
             }
+
+            const sessionData = sessionSnap.exists() ? sessionSnap.data() : null;
+
             // Build matrix: rows = memberName (or memberId), cols = date
             const rowsByMember = new Map();
             const dateSet = new Set();
@@ -182,14 +237,16 @@ function AdminReports() {
             snapshot.docs.forEach(docSnap => {
                 const data = docSnap.data();
                 const ts = data.checkInTime || data.timestamp || null;
-                const dateObj = ts && typeof ts.toDate === 'function' ? ts.toDate() : (ts ? new Date(ts) : new Date());
-                const dateKey = dateObj.toISOString().split('T')[0];
+                const dateKey = toDateKey(ts) || toDateKey(new Date());
+
+                if (!dateKey) return;
                 dateSet.add(dateKey);
 
                 const memberKey = data.memberName || data.memberId || data.uniqueIdentifier || docSnap.id;
                 if (!rowsByMember.has(memberKey)) rowsByMember.set(memberKey, {});
 
                 // store earliest check-in time for that date
+                const dateObj = toDateObj(ts) || new Date();
                 const timeStr = dateObj.toLocaleTimeString();
                 const existing = rowsByMember.get(memberKey)[dateKey];
                 if (!existing || timeStr < existing) {
@@ -197,9 +254,15 @@ function AdminReports() {
                 }
             });
 
-            const sortedDates = Array.from(dateSet).sort();
-            const header = ['Member', ...sortedDates.map(d => {
-                const dateObj = new Date(d);
+            const sessionRangeDays = sessionData
+                ? buildDateRange(sessionData.startDate, sessionData.endDate)
+                : [];
+
+            const sortedDates = Array.from(new Set([...sessionRangeDays, ...Array.from(dateSet)])).sort();
+            const totalTrackedDays = sortedDates.length;
+
+            const header = ['Member', 'Attendance Summary', ...sortedDates.map(d => {
+                const dateObj = new Date(`${d}T00:00:00`);
                 const weekday = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
                 const dateLabel = dateObj.toLocaleDateString();
                 return `${weekday} ${dateLabel}`;
@@ -208,7 +271,10 @@ function AdminReports() {
 
             Array.from(rowsByMember.keys()).sort().forEach(memberKey => {
                 const rowObj = rowsByMember.get(memberKey);
-                const row = [memberKey];
+                const attendedDays = sortedDates.reduce((count, dateKey) => count + (rowObj[dateKey] ? 1 : 0), 0);
+                const attendanceSummary = `${attendedDays}/${totalTrackedDays} days`;
+
+                const row = [memberKey, attendanceSummary];
                 sortedDates.forEach(d => {
                     row.push(rowObj[d] || '');
                 });
@@ -216,6 +282,12 @@ function AdminReports() {
             });
 
             const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
+            worksheet['!cols'] = [
+                { wch: 28 },
+                { wch: 18 },
+                ...sortedDates.map(() => ({ wch: 18 }))
+            ];
+
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
             XLSX.writeFile(workbook, `${sessionName}_Attendance_Matrix.xlsx`);

@@ -536,15 +536,27 @@ function AdminUsers() {
             return;
         }
 
+        const participant = Object.values(allSessionParticipants)
+            .flat()
+            .find(p => p.id === participantId);
+
+        if (!participant) {
+            alert('Participant record not found. Please refresh and try again.');
+            return;
+        }
+
+        const normalizedEmail = (editFormData.email || '').trim().toLowerCase();
+        const normalizedPhone = (editFormData.phone || '').trim();
+
         setLoading(true);
         try {
             await updateDoc(doc(db, 'participants', participantId), {
-                email: editFormData.email.toLowerCase(),
-                phone: editFormData.phone,
+                email: normalizedEmail,
+                phone: normalizedPhone,
                 uniqueIdentifier: createIdentityKey(
                     participant.name,
-                    editFormData.email.toLowerCase(),
-                    editFormData.phone.replace(/\D/g, '')
+                    normalizedEmail,
+                    normalizedPhone
                 )
             });
 
@@ -553,7 +565,7 @@ function AdminUsers() {
                 const updated = { ...prev };
                 Object.keys(updated).forEach(sessionId => {
                     updated[sessionId] = updated[sessionId].map(p =>
-                        p.id === participantId ? { ...p, email: editFormData.email.toLowerCase(), phone: editFormData.phone } : p
+                        p.id === participantId ? { ...p, email: normalizedEmail, phone: normalizedPhone } : p
                     );
                 });
                 return updated;

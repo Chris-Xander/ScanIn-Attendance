@@ -184,7 +184,7 @@ function CookiePolicy() {
                 <section>
                     <h2>Contact Information</h2>
                     <p>If you have questions about this Cookie Policy, our cookie practices, or your rights regarding cookies:</p>
-                    <p><strong>Email:</strong> [Insert Contact Email]</p>
+                    <p><strong>Email:</strong>kansocheckin@gmail.com</p>
                     <p><strong>Service Name:</strong> KansoCheckin (Attendid)</p>
                     <p><strong>Response Time:</strong> We aim to respond to cookie-related inquiries within 30 days.</p>
                     <p>For urgent privacy or security concerns, please contact us immediately.</p>

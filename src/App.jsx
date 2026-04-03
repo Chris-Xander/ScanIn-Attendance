@@ -2,11 +2,13 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { SubscriptionGuard } from './components/SubscriptionGuard';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import Member from './pages/Member';
 import Admin from './pages/Admin';
 import Signup from './pages/Signup';
+import SubscriptionPaywall from './pages/SubscriptionPaywall';
 import PublicScan from './pages/PublicScan';
 import ScanForm from './pages/ScanForm';
 import SessionCheckin from './pages/SessionCheckin';
@@ -45,6 +47,7 @@ function App() {
             <Route path="/data-retention-policy" element={<DataRetentionPolicy/>}/>
             <Route path="/reports" element={<GateReport/>}/>
             <Route path="/about" element={<About/>}/>
+            <Route path="/paywall" element={<SubscriptionPaywall />} />
 
             <Route 
               path="/member" 
@@ -58,7 +61,9 @@ function App() {
               path="/admin" 
               element={
                 <ProtectedRoute requiredRole="admin">
-                  <Admin />
+                  <SubscriptionGuard>
+                    <Admin />
+                  </SubscriptionGuard>
                 </ProtectedRoute>
               } 
             />

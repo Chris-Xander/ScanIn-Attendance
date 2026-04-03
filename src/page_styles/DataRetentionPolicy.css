@@ -99,6 +99,10 @@
   border-bottom: 1px solid #e0e0e0;
 }
 
+.data-retention-content td {
+  color: #303030;
+}
+
 .data-retention-content th {
   background: #e3f2fd;
   color: #1976d2;

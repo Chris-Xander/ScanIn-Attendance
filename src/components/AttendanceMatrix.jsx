@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import './AttendanceMatrix.css';
 
@@ -24,6 +24,60 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const dayName = dayNames[date.getUTCDay()];
         return `${dayName} ${dateStr}`;
+    };
+
+    const toDateObj = (val) => {
+        if (!val) return null;
+        if (typeof val === 'string') return new Date(val);
+        if (val instanceof Date) return val;
+        if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+        try { return new Date(val); } catch (e) { return null; }
+    };
+
+    const toDateKey = (val) => {
+        if (!val) return null;
+
+        if (typeof val === 'string') {
+            const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (match) return match[1];
+        }
+
+        const date = toDateObj(val);
+        if (!date || Number.isNaN(date.getTime())) return null;
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const buildDateRange = (startValue, endValue) => {
+        const startKey = toDateKey(startValue);
+        const endKey = toDateKey(endValue);
+
+        if (!startKey || !endKey) return [];
+
+        const cursor = new Date(`${startKey}T00:00:00`);
+        const end = new Date(`${endKey}T00:00:00`);
+
+        if (Number.isNaN(cursor.getTime()) || Number.isNaN(end.getTime()) || end < cursor) {
+            return [];
+        }
+
+        const range = [];
+        while (cursor <= end) {
+            range.push(toDateKey(cursor));
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        return range;
+    };
+
+    const getAttendanceSummary = (row) => {
+        const totalTrackedDays = days.length;
+        const attendedDays = days.reduce((count, day) => count + (row.days[day] ? 1 : 0), 0);
+
+        return `${attendedDays}/${totalTrackedDays} days`;
     };
 
     useEffect(() => {
@@ -157,13 +211,6 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
 
             // Group records by person and consolidate their check-ins
             const daySet = new Set();
-            const toDateObj = (val) => {
-                if (!val) return null;
-                if (typeof val === 'string') return new Date(val);
-                if (val instanceof Date) return val;
-                if (val.toDate && typeof val.toDate === 'function') return val.toDate();
-                try { return new Date(val); } catch (e) { return null; }
-            };
 
             // Create a map to group records by person (using email as primary key, fallback to name)
             const personMap = new Map();
@@ -224,7 +271,24 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                 days: person.days
             }));
 
-            const sortedDays = Array.from(daySet).sort();
+            let sortedDays = Array.from(daySet).sort();
+
+            if (mode === 'session' && sessionId) {
+                try {
+                    const sessionSnap = await getDoc(doc(db, 'sessions', sessionId));
+                    if (sessionSnap.exists()) {
+                        const sessionData = sessionSnap.data();
+                        const sessionRangeDays = buildDateRange(sessionData.startDate, sessionData.endDate);
+
+                        if (sessionRangeDays.length > 0) {
+                            sortedDays = Array.from(new Set([...sessionRangeDays, ...sortedDays])).sort();
+                        }
+                    }
+                } catch (sessionErr) {
+                    console.error('Error loading session date range for attendance matrix:', sessionErr);
+                }
+            }
+
             setDays(sortedDays);
             setMatrix(rows);
         } catch (err) {
@@ -298,6 +362,7 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                                     <tr>
                                         <th>#</th>
                                         <th>Name</th>
+                                        <th className="summary-col">Attendance</th>
                                         {days.map(d => (
                                             <th key={d}>{formatDateWithDay(d)}</th>
                                         ))}
@@ -316,6 +381,9 @@ export default function AttendanceMatrix({ mode, sessionId, qrCodeId, onClose })
                                         >
                                             <td>{idx + 1}</td>
                                             <td className="name-col" onClick={() => setSelectedRow(row)} style={{ cursor: 'pointer' }} title="View details">{highlightSearchText(row.name, searchQuery)}</td>
+                                            <td className="summary-col" title={`${getAttendanceSummary(row)} attended`}>
+                                                {getAttendanceSummary(row)}
+                                            </td>
                                             {days.map(day => {
                                                 const cell = row.days[day];
                                                 return (

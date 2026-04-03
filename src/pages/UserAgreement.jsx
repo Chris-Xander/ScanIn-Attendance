@@ -200,8 +200,8 @@ function UserAgreement() {
                 <section>
                     <h2>Contact Information</h2>
                     <p>For questions about these Terms:</p>
-                    <p><strong>Email:</strong> [Insert Contact Email]</p>
-                    <p><strong>Organization/Company Name:</strong> [Insert Name]</p>
+                    <p><strong>Email:</strong> kansocheckin@gmail.com</p>
+                    <strong>KansoCheckin.com</strong> 
                 </section>
             </div>
         </div>

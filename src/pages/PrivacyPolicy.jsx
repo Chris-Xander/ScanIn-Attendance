@@ -187,8 +187,8 @@ function PrivacyPolicy() {
                 <section>
                     <h2> Contact Information</h2>
                     <p>For privacy-related inquiries:</p>
-                    <p><strong>Email:</strong> [Insert Contact Email]</p>
-                    <p><strong>Organization Name:</strong> [Your Company/Project Name]</p>
+                    <p><strong>Email:</strong>kansocheckin@gmail.com</p>
+                    <strong>KansoCheckin.com</strong>
                 </section>
             </div>
         </div>
