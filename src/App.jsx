@@ -19,6 +19,7 @@ import CookiePolicy from './pages/CookiePolicy';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import UserAgreement from './pages/UserAgreement';
 import DataRetentionPolicy from './pages/DataRetentionPolicy';
+import PaymentSuccess from './pages/PaymentSuccess';
 
 const theme = createTheme({
   palette: {
@@ -48,6 +49,7 @@ function App() {
             <Route path="/reports" element={<GateReport/>}/>
             <Route path="/about" element={<About/>}/>
             <Route path="/paywall" element={<SubscriptionPaywall />} />
+            <Route path="/payment-success/*" element={<PaymentSuccess />} />
 
             <Route 
               path="/member" 

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscription } from '../hooks/useSubscription';
+import { useAuth } from '../contexts/AuthContext';
 import './SubscriptionPaywall.css';
+import { initPayment } from '../services/paymentService';
 
 const PLANS = [
   {
     id: 'weekly',
     label: 'Weekly',
-    price: 'Ghc20.99',
+    price: 'Ghc1.99',
     period: '/week',
     days: 7,
     features: ['7 days access', 'Full features', 'Cancel anytime'],
@@ -35,31 +37,37 @@ const PLANS = [
 
 export default function SubscriptionPaywall() {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const { trialUsed, loading, error, startFreeTrial, activateSubscription } = useSubscription();
   const [activating, setActivating] = useState(null);
   const [errors, setErrors] = useState({});
 
   const handleFreeTrial = async () => {
+    setActivating('trial');
     try {
-      setActivating('trial');
-      setErrors({});
       await startFreeTrial();
       navigate('/admin');
     } catch (err) {
-      setErrors({ trial: err.message || 'Failed to activate free trial' });
+      setErrors((prev) => ({ ...prev, trial: err.message || 'Trial activation failed' }));
     } finally {
       setActivating(null);
     }
   };
 
-  const handlePlan = async (planId) => {
+  const handlePlan = async (plan) => {
+    if (!currentUser) {
+      setErrors({ general: 'Please log in to subscribe' });
+      navigate('/login');
+      return;
+    }
+    
     try {
-      setActivating(planId);
-      setErrors({});
-      await activateSubscription(planId);
-      navigate('/admin');
+      setActivating(plan);
+      const userEmail = currentUser.email;
+      const { authorization_url } = await initPayment(userEmail, plan);
+      window.location.href = authorization_url;  // Redirect to Paystack
     } catch (err) {
-      setErrors({ [planId]: err.message || `Failed to activate ${planId} plan` });
+      setErrors({ ...errors, [plan]: err.message });
     } finally {
       setActivating(null);
     }

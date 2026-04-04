@@ -8,6 +8,12 @@ const activateSubscriptionFn = httpsCallable(functions, 'activateSubscription');
 
 let cachedSubscription = null;
 
+// Add to exports
+export const verifyPaymentHook = async (ref) => {
+  // Use paymentService.verifyPayment(ref)
+  await refresh();  // After verify
+};
+
 export function useSubscription() {
   const [state, setState] = useState({
     isActive: false,

@@ -535,3 +535,45 @@
     padding: 1.5rem;
   }
 }
+
+@media (max-width: 380px) {
+  .paywall-main {
+    width: 80%;
+  }
+
+  .paywall-hero {
+    flex-wrap: wrap;
+    max-width: 280px;
+  }
+
+  .paywall-container {
+    padding: 0;
+  }
+
+  .paywall-title {
+    font-size: 1.5rem;
+  }
+
+  .paywall-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .trial-card,
+  .plan-card {
+    padding: 1.5rem;
+    margin: auto;
+    max-width: 245px;
+    width: 100%;
+    max-height: 460px;
+  }
+
+  .plan-features li {
+    font-size: 0.85rem;
+  }
+
+  .paywall-footer-info {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+}
+

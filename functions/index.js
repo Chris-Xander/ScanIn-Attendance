@@ -4,7 +4,11 @@ const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https')
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
+const crypto = require('crypto'); // Node built-in
 const QRCodeReader = require('qrcode-reader'); 
+
+const PAYSTACK_SECRET_KEY = 'sk_test_7b38ef839f8c67f1438fc80e4c0366e4f55f7a67';
+const PAYSTACK_PUBLIC_KEY = 'pk_test_a61f466106dd32f31d800a9118f769be0ba6e8d2'
 
 admin.initializeApp();
 setGlobalOptions({ maxInstances: 10, region: 'us-central1' });
@@ -12,7 +16,9 @@ setGlobalOptions({ maxInstances: 10, region: 'us-central1' });
 // Allowed origins for CORS (use HTTP endpoint from client)
 const CORS_ORIGINS = [
   'http://localhost:5173',
+  'http://localhost:5174',
   'http://localhost:3000',
+  'http://localhost:5176',
   'https://chris-xander.github.io',
   'https://attendance-app-3efdc.web.app',
   'https://attendance-app-3efdc.firebaseapp.com',
@@ -71,9 +77,13 @@ async function enqueueDeletionJob(db, sessionId, requestedBy, totalCount) {
 }
 
 function setCors(res, origin) {
-  const allowOrigin = origin && CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
-  res.set('Access-Control-Allow-Origin', allowOrigin);
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  // Exact match or wildcard for dev
+  if (origin && (origin.includes('localhost') || CORS_ORIGINS.includes(origin))) {
+    res.set('Access-Control-Allow-Origin', origin);
+  } else {
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Max-Age', '86400');
 }
@@ -81,6 +91,16 @@ function setCors(res, origin) {
 function sendError(res, origin, code, message, status = 400) {
   setCors(res, origin);
   res.status(status).json({ error: { code, message } });
+}
+
+function verifyPaystackTransaction(reference) {
+  const paystack = require('paystack')(PAYSTACK_SECRET_KEY);
+  return new Promise((resolve, reject) => {
+    paystack.transaction.verify(reference, (err, response) => {
+      if (err) return reject(err);
+      resolve(response);
+    });
+  });
 }
 
 exports.deleteSessionHttp = onRequest(
@@ -281,6 +301,231 @@ exports.validateQRAttendance = onCall(
     };
   }
 );
+
+// Plans (internal - kobo equiv, secure)
+const PLANS = {
+  weekly: { amount: 10, days: 7 },    // ~GH₵20.99
+  monthly: { amount: 3999, days: 30 }, // ~GH₵39.99
+  annual: { amount: 39999, days: 365 } // ~GH₵399.99
+};
+
+// 1. INIT PAYMENT (HTTP endpoint - POST /initPayment)
+exports.initPaymentHttp = onRequest({ region: 'us-central1' }, async (req, res) => {
+  const origin = req.get('Origin') || (req.get('Referer') && new URL(req.get('Referer')).origin);
+  setCors(res, origin);
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    sendError(res, origin, 'invalid-argument', 'POST only', 405);
+    return;
+  }
+
+  try {
+    const authHeader = req.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      sendError(res, origin, 'unauthenticated', 'Auth header required', 401);
+      return;
+    }
+
+    const idToken = authHeader.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const uid = decoded.uid;
+
+    const { plan, email } = req.body;
+
+    if (!PLANS[plan]) {
+      sendError(res, origin, 'invalid-argument', 'Invalid plan', 400);
+      return;
+    }
+    if (!email) {
+      sendError(res, origin, 'invalid-argument', 'Email required', 400);
+      return;
+    }
+
+    const db = admin.firestore();
+    const reference = `pay_${uid}_${Date.now()}`;
+
+    // Store pending payment
+    await db.collection('payments').doc(reference).set({
+      userId: uid,
+      email,
+      plan,
+      amount: PLANS[plan].amount,
+      status: 'pending',
+      reference,
+      metadata: { userId: uid, plan },
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+// Paystack init - FIXED with logging
+    logger.info('Paystack init starting', { plan, email: email.substring(0, 3)+'...', reference });
+
+    // Paystack init - FIXED: SDK expects callback, not promise
+    logger.info('Paystack init starting (callback mode)', { plan, email: email.substring(0, 3)+'...', reference });
+
+    const paystack = require('paystack')(PAYSTACK_SECRET_KEY);
+    
+    const response = await new Promise((resolve, reject) => {
+      paystack.transaction.initialize({
+        amount: PLANS[plan].amount,
+        email,
+        reference,
+        callback_url: `${origin}/payment-success`,
+
+        metadata: { userId: uid, plan }
+      }, (err, response) => {
+        if (err) {
+          logger.error('Paystack initialize callback error', { error: err.message || err });
+          return reject(new Error(`Paystack API error: ${err.message || err}`));
+        }
+        logger.info('Paystack init callback success', { hasData: !!response?.data, ref: reference });
+        if (!response?.data) {
+          logger.error('Paystack callback missing data', { response });
+          return reject(new Error('Invalid Paystack response format'));
+        }
+        resolve(response);
+      });
+    });
+    logger.info('Paystack init final success', { url: response.data.authorization_url?.substring(0, 50)+'...', reference });
+
+    logger.info('Paystack init success', { url: response.data.authorization_url?.substring(0, 50)+'...', reference });
+
+    res.json({
+      authorization_url: response.data.authorization_url,
+      reference,
+      access_code: response.data.access_code
+    });
+  } catch (err) {
+    logger.error('initPaymentHttp error:', { 
+      message: err.message, 
+      stack: err.stack,
+      plan, 
+      uid,
+      hasPaystack: !!paystack 
+    });
+    sendError(res, origin, 'internal', `Payment init failed: ${err.message}`, 500);
+  }
+});
+
+// 2. WEBHOOK (CRITICAL - source of truth)
+exports.paystackWebhook = onRequest({ region: 'us-central1', invoker: 'public' }, async (req, res) => {
+  const origin = req.get('Origin') || req.get('Referer')?.split('/')[2]?.replace('www.', '');
+  setCors(res, origin); // Use your existing setCors function
+
+  if (req.method !== 'POST') {
+    sendError(res, origin, 'invalid-argument', 'POST only', 405);
+    return;
+  }
+
+  try {
+    const hash = crypto.createHmac('sha512', PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body)).digest('hex');
+    if (hash !== req.get('x-paystack-signature')) {
+      sendError(res, origin, 'invalid-argument', 'Invalid signature', 400);
+      return;
+    }
+
+    if (req.body.event !== 'charge.success') {
+      res.status(200).send('OK'); // Ignore other events
+      return;
+    }
+
+    const { reference } = req.body.data;
+    const db = admin.firestore();
+    const paymentRef = db.collection('payments').doc(reference);
+    const paymentSnap = await paymentRef.get();
+
+    if (!paymentSnap.exists || paymentSnap.data().status === 'success') {
+      res.status(200).send('OK'); // Already processed or not found
+      return;
+    }
+
+    // Verify with Paystack
+    let verify;
+    try {
+      verify = await verifyPaystackTransaction(reference);
+    } catch (verifyErr) {
+      logger.error('Paystack verify API error', verifyErr);
+      res.status(400).json({ error: 'Verification service error', reference });
+      return;
+    }
+    const tr = verify.data;
+
+    if (tr.status === 'success' && tr.reference === reference) {
+      const payment = paymentSnap.data();
+      const uid = payment.userId;
+      const planDays = PLANS[payment.plan].days;
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + planDays * 24 * 60 * 60 * 1000);
+
+      // Update payment
+      await paymentRef.update({
+        status: 'success',
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        paystackData: tr
+      });
+
+      // Activate subscription
+      await db.collection('subscriptions').doc(uid).set({
+        plan: payment.plan,
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        trialUsed: true,
+        activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        userId: uid,
+        email: payment.email
+      }, { merge: true });
+    }
+
+    res.status(200).send('OK');
+  } catch (err) {
+    logger.error('Webhook error:', err);
+    res.status(500).send('Error');
+  }
+});
+
+// 3. VERIFY (Frontend UI only - NO activation)
+exports.verifyPayment = onRequest({ region: 'us-central1', invoker: 'public' }, async (req, res) => {
+  const origin = req.get('Origin');
+  setCors(res, origin);
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  const reference = req.path.split('/').pop(); // /verify-payment/{ref}
+  if (!reference) {
+    sendError(res, origin, 'invalid-argument', 'Missing reference', 400);
+    return;
+  }
+
+  try {
+    let paystack;
+    try {
+      paystack = require('paystack')(PAYSTACK_SECRET_KEY);
+    } catch (e) {
+      logger.error('Paystack verifyPayment load error', e);
+      res.status(500).json({ error: 'Service unavailable' });
+      return;
+    }
+
+    let verify;
+    try {
+      verify = await verifyPaystackTransaction(reference);
+      logger.info('verifyPayment success', { reference, status: verify.data?.status });
+    } catch (verifyErr) {
+      logger.error('Paystack verifyPayment API error', verifyErr);
+      res.status(400).json({ error: 'Verification failed', reference });
+      return;
+    }
+    res.json({ status: verify.data.status, reference, amount: verify.data.amount / 100 });
+  } catch (err) {
+    res.status(400).json({ error: 'Verification failed', reference });
+  }
+});
 
 // Subscription functions
 exports.checkSubscriptionStatus = onCall(

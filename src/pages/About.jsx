@@ -18,7 +18,7 @@ function About() {
 
                     <h2>Key Features</h2>
                     <section>
-                        <p>fuuuuh</p>
+                        <p>Pending Please Wait...</p>
                     </section>
 
                 <section>
