@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isOwner(adminId) {
+      return isSignedIn() && request.auth.uid == adminId;
+    }
+
+    // Users can access self-docs
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // Admin collections: sessions, participants, sessionMemberData
+    match /sessions/{sessionId} {
+      allow read, create, update, delete: if isAdmin() || isOwner(resource.data.adminId);
+    }
+
+    match /participants/{participantId} {
+      allow read, create, update, delete: if isAdmin() || isOwner(resource.data.adminId);
+    }
+
+    match /sessionMemberData/{metaId} {
+      allow read, create, update, delete: if isAdmin() || isOwner(resource.data.adminId);
+    }
+
+    match /members/{memberId} {
+      allow read, create, update, delete: if isAdmin() || isOwner(resource.data.adminId);
+    }
+
+    // Public collection
+    match /scanForms/{formId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Subscriptions (self only)
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // Payments (locked down)
+    match /payments/{doc} {
+      allow read, write: if false;
+    }
+
+    // Catch-all deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

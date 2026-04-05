@@ -107,7 +107,16 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Refresh token to ensure latest custom claims (admin role)
+        try {
+          await user.getIdToken(true);
+          // Token refreshed, currentUser will have updated claims on next auth state change
+        } catch (error) {
+          console.warn('Token refresh failed:', error);
+        }
+      }
       setCurrentUser(user);
       setLoading(false);
     });

@@ -7,6 +7,10 @@ const admin = require('firebase-admin');
 const crypto = require('crypto'); // Node built-in
 const QRCodeReader = require('qrcode-reader'); 
 
+function isAdmin(decoded) {
+  return !!decoded.admin;
+}
+
 const PAYSTACK_SECRET_KEY = 'sk_test_7b38ef839f8c67f1438fc80e4c0366e4f55f7a67';
 const PAYSTACK_PUBLIC_KEY = 'pk_test_a61f466106dd32f31d800a9118f769be0ba6e8d2'
 
@@ -537,8 +541,16 @@ exports.checkSubscriptionStatus = onCall(
     const uid = request.auth.uid;
     const db = admin.firestore();
     
+    logger.info('SUB DOC CHECK:', { uid, exists: false });
     const subRef = db.collection('subscriptions').doc(uid);
     const subSnap = await subRef.get();
+    
+    logger.info('SUB DOC:', { 
+      uid, 
+      exists: subSnap.exists, 
+      data: subSnap.exists ? subSnap.data() : null,
+      deletedRecently: !subSnap.exists 
+    });
     
     if (!subSnap.exists) {
       return {
@@ -588,6 +600,7 @@ exports.activateFreeTrial = onCall(
     const now = new Date();
     const trialEnd = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000); // 21 days
     
+    logger.info('CREATING TRIAL SUBSCRIPTION:', { uid });
     await subRef.set({
       plan: 'trial',
       trialUsed: true,
@@ -608,62 +621,34 @@ exports.activateFreeTrial = onCall(
   }
 );
 
+/* DISABLED: activateSubscription - insecure, use webhook only 
 exports.activateSubscription = onCall(
   { cors: true, region: 'us-central1' },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Must be logged in');
-    }
-    const uid = request.auth.uid;
-    const { plan, paymentProof } = request.data;
-    
-    if (!plan) {
-      throw new HttpsError('invalid-argument', 'Plan is required');
-    }
-    
-    // In a real app, verify paymentProof here
-    // For now, assume it's valid
-    
-    // Get user info from Firebase Auth
-    const userRecord = await admin.auth().getUser(uid);
-    
-    const db = admin.firestore();
-    const subRef = db.collection('subscriptions').doc(uid);
-    
-    const now = new Date();
-    let expiresAt;
-    
-    // Calculate expiration based on plan
-    switch (plan) {
-      case 'weekly':
-        expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'monthly':
-        expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-        break;
-      case 'annual':
-        expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        throw new HttpsError('invalid-argument', 'Invalid plan');
-    }
-    
-    await subRef.set({
-      plan,
-      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-      trialUsed: true, // Once subscribed, trial is considered used
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      userId: uid,
-      email: userRecord.email,
-      displayName: userRecord.displayName || userRecord.email
-    }, { merge: true });
-    
-    return {
-      active: true,
-      plan,
-      trialUsed: true,
-      subscriptionEnd: admin.firestore.Timestamp.fromDate(expiresAt),
-      daysRemaining: Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24))
-    };
+    throw new HttpsError('permission-denied', 'Direct activation disabled. Use payment webhook only.');
   }
 );
+*/
+
+// Admin role assignment - only admins can assign admins
+exports.setAdminClaims = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  if (!isAdmin(request.auth.token)) {
+    throw new HttpsError('permission-denied', 'Only admins can assign admin roles');
+  }
+
+  const { uid } = request.data;
+
+  if (!uid) {
+    throw new HttpsError('invalid-argument', 'UID required');
+  }
+
+  await admin.auth().setCustomUserClaims(uid, { admin: true });
+
+  // Note: Client must call getIdToken(true) to refresh claims
+  return { success: true, message: `Admin claims set for ${uid}. Refresh token on client.` };
+});
+

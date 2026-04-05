@@ -4,7 +4,7 @@ import { functions } from '../firebase/config';
 
 const checkSubscriptionStatusFn = httpsCallable(functions, 'checkSubscriptionStatus');
 const activateFreeTrialFn = httpsCallable(functions, 'activateFreeTrial');
-const activateSubscriptionFn = httpsCallable(functions, 'activateSubscription');
+/* DISABLED activateSubscriptionFn - use payment webhook only */
 
 let cachedSubscription = null;
 
@@ -78,44 +78,24 @@ export function useSubscription() {
     }
   }, []);
 
+  /* DISABLED: activateSubscription - use initPayment + webhook only
   const activateSubscription = useCallback(async (plan) => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const res = await activateSubscriptionFn({
-        plan,
-        paymentProof: 'backend-simulated-payment-token',
-      });
-      const data = res.data;
-
-      if (data.subscriptionEnd) {
-        data.expiresAt = new Date(data.subscriptionEnd);
-      }
-
-      setState({
-        isActive: !!data.active,
-        plan: data.plan || plan,
-        expiresAt: data.expiresAt || null,
-        trialUsed: !!data.trialUsed,
-        daysRemaining: data.daysRemaining || null,
-        loading: false,
-        error: null,
-      });
-      return data;
-    } catch (err) {
-      console.error('activateSubscription error:', err);
-      setState((prev) => ({ ...prev, loading: false, error: err }));
-      throw err;
-    }
-  }, []);
+    throw new Error('Direct subscription activation disabled. Complete payment via Paystack.');
+  }, []); */
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
+  // Stub for backward compatibility
+  const activateSubscription = useCallback(async () => {
+    throw new Error('Subscription activation disabled. Use Paystack checkout.');
+  }, []);
+  
   return {
     ...state,
     refresh,
     startFreeTrial,
-    activateSubscription,
+    activateSubscription, // Safe stub
   };
 }
