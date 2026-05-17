@@ -1,0 +1,19 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "customQRCodes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "qrId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isActive",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

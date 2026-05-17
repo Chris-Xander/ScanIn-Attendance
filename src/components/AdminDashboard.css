@@ -1,0 +1,72 @@
+/* Admin Dashboard Styles */
+.dashboard-content {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 10px;
+  margin: auto;
+  gap: 1.8rem;
+
+}
+
+.dashboard-container h2 {
+  color: #ffffff;
+}
+
+.dashboard-stats-container {
+  display: flex;
+  flex-direction: row;
+
+}
+
+.dashboard-stat {
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e3e8ee;
+  transition: all 0.3s ease;
+  text-align: center;
+  max-height: 350px;
+  height: 100%;
+  max-width:300px;
+  width: 100%;
+  margin: auto;
+}
+
+.dashboard-stat:hover {
+  transform: translateY(-200px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.52);
+}
+
+.dashboard-stat h3 {
+  margin: 0 0 0.5rem 0;
+  color: #1976d2;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dashboard-stat p {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1976d2;
+}
+
+/* Mobile Responsive for Dashboard */
+@media (max-width: 415px) {
+
+  .dashboard-stat {
+    padding: 1rem;
+  }
+
+  .dashboard-stat h3 {
+    font-size: 0.9rem;
+  }
+
+  .dashboard-stat p {
+    font-size: 1.5rem;
+  }
+}

@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(adminId) {
+      return isSignedIn() && request.auth.uid == adminId;
+    }
+
+    // Users can access self-docs
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Admin-owned collections (queries allowed via frontend where("adminId", "==", uid))
+    match /sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.adminId);
+    }
+
+    match /participants/{participantId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.adminId);
+    }
+
+    match /sessionMemberData/{metaId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.adminId);
+    }
+
+    match /members/{memberId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.adminId);
+    }
+
+    match /devices/{docId} {
+      allow read, create, update: if true; //Public Device Registration
+      allow delete: if false;
+    }
+
+    match /sessionDeviceBindings/{docId} {
+      allow read, create, update: if true;
+      allow delete: if false;
+    }
+
+    match /formSubmitCheck/{docId} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    match /qrGateReports/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.adminId);
+    }
+
+
+    match /attendanceRecords/{docId} {
+      allow read: if true;   // optional, maybe admin-only read
+      allow create: if true;         // allow anyone to submit attendance
+      allow update, delete: if false; // block edits/deletes from public
+    }
+
+    match /formSubmitData/{docId} {
+      allow create: if true;        // anyone can submit
+      allow read: if isSignedIn()
+        && resource.data.adminId == request.auth.uid;         // no reads from frontend
+      allow update, delete: if false;
+    }
+
+    match /formSubmitCheck/{docId} {
+      allow read, create: if true;        // anyone can submit
+      allow update, delete: if false;
+    }
+
+    match /customQRCodes/{docId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.adminId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.adminId);
+    }
+
+    // Public collection
+    match /scanForms/{formId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Subscriptions (self only)
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // Payments (locked down)
+    match /payments/{doc} {
+      allow read, write: if false;
+    }
+
+    // Catch-all deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

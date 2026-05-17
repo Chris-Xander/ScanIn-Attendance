@@ -1,0 +1,1509 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { db } from '../firebase/config';
+import { writeBatch, collection, addDoc, getDocs, query, where, onSnapshot, doc, updateDoc, deleteDoc, getDocs as getAllDocs } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
+import QRCode from 'react-qr-code';
+import { deleteSession } from '../cloud_functions/sessionService'
+import useDeviceLocation from './useDeviceLocation';
+import './AdminUsers.css';
+
+function AdminUsers() {
+    const { currentUser } = useAuth();
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState('members');
+    const [members, setMembers] = useState([]);
+    const [sessions, setSessions] = useState([]);
+    const [attendanceLogs, setAttendanceLogs] = useState([]);
+    const { location, error, getLocation } = useDeviceLocation();
+    const [loading, setLoading] = useState(false);
+    const [registering, setRegistering] = useState(false);
+    const [showSessionSelectModal, setShowSessionSelectModal] = useState(false);
+    const [selectedSessionId, setSelectedSessionId] = useState(null);
+
+
+    const NAME_FIELDS = [
+        "name",
+        "full name",
+        "fullname",
+        "participant name",
+        "member name",
+        "membername",
+        "username"
+    ];
+
+    const EMAIL_FIELDS = [
+        "email",
+        "email address",
+        "emailaddress",
+        "participant email",
+        "member email",
+        "memberemail",
+        "user email",
+        "student email",
+        "work email"
+    ];
+
+    const PHONE_FIELDS = [
+        "phone",
+        "phone number",
+        "phonenumber",
+        "participant phone",
+        "member phone",
+        "memberphone",
+        "user phone",
+        "contact",
+        "contacts",
+        "contact number",
+        "contactnumber"
+    ]
+
+    // Create a deterministic identity key from name + email + contact
+    const createIdentityKey = (name, email, contact) => {
+        const n = (name || '').trim().toLowerCase();
+        const e = (email || '').trim().toLowerCase();
+        const p = (contact || '').replace(/\D/g, '');
+
+        if (e) {
+            return `${n}|${e}`;
+        }
+
+        if (p) {
+            return `${n}|${p}`;
+        }
+
+        return null; // No valid identifier available
+    };
+
+    const toggleActive = async (sessionId, currentStatus) => {
+            try {
+                await updateDoc(doc(db, 'sessions', sessionId), {
+                    isActive: !currentStatus
+                });
+                fetchSessions();
+            } catch (error) {
+                console.error('Error updating Session:', error);
+            } 
+        };
+
+    const findColumnValue = (row, allowedFields) => {
+        const keys = Object.keys(row);
+
+        for (const key of keys) {
+            const normalizedKey = key.trim().toLowerCase().replace(/[^\w\s]/g, '') .replace(/\s+/g, ' ');;
+
+            if (allowedFields.includes(normalizedKey)) {
+                return row[key];
+            }
+        }
+
+        return '';
+    }
+
+    const buildColumnMap = (sampleRow) => {
+        const map = {};
+        const keys = Object.keys(sampleRow || {});
+
+        for (const key of keys) {
+            const normalizedKey = key
+                .trim()
+                .toLowerCase()
+                .replace(/[^\w\s]/g, '')
+                .replace(/\s+/g, ' ');
+
+            if (normalizedKey.includes('name')) {
+                map.name = key;
+            }
+            if (normalizedKey.includes('email')) {
+                map.email = key;
+            }
+            if (normalizedKey.includes('phone') || normalizedKey.includes('contact')) {
+                map.phone = key;
+            }
+        }
+
+        return map;
+    };
+
+
+    // Session form state
+    const [sessionForm, setSessionForm] = useState({
+        name: '',
+        description: '',
+        location: '',
+        startDate: '',
+        endDate: '',
+        maxParticipants: '',
+        geofence: {
+            latitude: '',
+            longitude: '',
+            radius: ''
+        }
+    });
+
+    // Member registration state
+    const [csvFile, setCsvFile] = useState(null);
+    const [csvData, setCsvData] = useState([]);
+    const [csvValidationErrors, setCsvValidationErrors] = useState([]);
+    const [sessionValidationErrors, setSessionValidationErrors] = useState([]);
+
+    // QR Code modal state
+    const [showQRModal, setShowQRModal] = useState(false);
+    const [selectedSession, setSelectedSession] = useState(null);
+
+    // Delete confirmation modal state
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [sessionToDelete, setSessionToDelete] = useState(null);
+    const [allSessionParticipants, setAllSessionParticipants] = useState({});
+    const [editingParticipantId, setEditingParticipantId] = useState(null);
+    const [editFormData, setEditFormData] = useState({ email: '', phone: '' });
+    const [showRemoveModal, setShowRemoveModal] = useState(false);
+    const [participantToRemove, setParticipantToRemove] = useState(null);
+    // NEW: Participants table modal state
+    const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+    const [selectedSessionForModal, setSelectedSessionForModal] = useState(null);
+    const [participantsSearchOpen, setParticipantsSearchOpen] = useState(false);
+    const [participantsSearchQuery, setParticipantsSearchQuery] = useState('');
+    const [participantSearchMatchCount, setParticipantSearchMatchCount] = useState(0);
+    const [participantHighlightedIds, setParticipantHighlightedIds] = useState([]);
+    const participantRowRefs = useRef({});
+    const participantHighlightTimeoutRef = useRef(null);
+
+    useEffect(() => {
+        if (activeTab === 'members') {
+            fetchMembers();
+            fetchSessions();
+            fetchAllSessionParticipants();
+        } else if (activeTab === 'sessions') {
+            fetchSessions();
+        } else if (activeTab === 'dashboard') {
+            fetchAttendanceLogs();
+        }
+    }, [activeTab]);
+
+    // Update geofence form when location is retrieved
+    useEffect(() => {
+        if (location && location.includes(',')) {
+            const [lat, lng] = location.split(',');
+            setSessionForm(prev => ({
+                ...prev,
+                geofence: {
+                    ...prev.geofence,
+                    latitude: lat,
+                    longitude: lng
+                }
+            }));
+        }
+    }, [location]);
+
+    const fetchMembers = async () => {
+        try {
+            const membersRef = collection(db, 'members');
+            const q = query(membersRef, where('adminId', '==', currentUser.uid));
+            const snapshot = await getDocs(q);
+            const membersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setMembers(membersData);
+        } catch (error) {
+            console.error('Error fetching members:', error);
+        }
+    };
+
+    const fetchSessions = async () => {
+        try {
+            const sessionsRef = collection(db, 'sessions');
+            const q = query(sessionsRef, where('adminId', '==', currentUser.uid));
+            const snapshot = await getDocs(q);
+            const sessionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setSessions(sessionsData);
+
+            // Fetch participants after sessions are loaded
+            await fetchAllSessionParticipants();
+        } catch (error) {
+            console.error('Error fetching sessions:', error);
+        } 
+    };
+
+    const fetchAttendanceLogs = async () => {
+        try {
+            const logsRef = collection(db, 'attendanceRecords');
+            const q = query(logsRef, where('adminId', '==', currentUser.uid));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setAttendanceLogs(logsData);
+            });
+            return unsubscribe;
+        } catch (error) {
+            console.error('Error fetching attendance logs:', error);
+        }   };
+
+    const handleSessionSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);  
+        try {
+            const sessionId = `ses_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            // Generate QR code value with session ID
+            const qrCodeValue = `${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${sessionId}`;
+            
+            const sessionData = {
+                ...sessionForm,
+                adminId: currentUser.uid,
+                sessionId, 
+                qrCodeValue,
+                createdAt: new Date(),
+
+                isActive: true,
+                attendanceCount: 0,
+                geofence: {
+                    latitude: sessionForm.geofence?.latitude ? parseFloat(sessionForm.geofence.latitude) : null,
+                    longitude: sessionForm.geofence?.longitude ? parseFloat(sessionForm.geofence.longitude) : null,
+                    radius: sessionForm.geofence?.radius ? parseFloat(sessionForm.geofence.radius) : null
+                }
+            };
+            
+            await addDoc(collection(db, 'sessions'), sessionData);
+            
+            setSessionForm({
+                name: '',
+                description: '',
+                location: '',
+                startDate: '',
+                endDate: '',
+                maxParticipants: '',
+                geofence: {
+                    latitude: '',
+                    longitude: '',
+                    radius: ''
+                }
+            });
+            fetchSessions();
+            alert('Session created successfully with QR code!');
+        } catch (error) {
+            console.error('Error creating session:', error);
+            alert('Failed to create session');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCsvUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setCsvFile(file);
+            setCsvValidationErrors([]);
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const data = evt.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                setCsvData(jsonData);
+            };
+            reader.readAsBinaryString(file);
+        }
+    };
+
+    const handleDefaultClick = () => {
+        const location = getLocation();
+
+        setSessionForm(prev => ({
+            ...prev,
+            geofence: {
+                ...prev.geofence,
+                location,
+                radius: 100 // default radius in meters
+            }
+        }));
+    };
+
+    const exportSessionAttendance = async (sessionId, sessionName) => {
+        try {
+            // Fetch attendance logs
+            const logsRef = collection(db, 'attendanceLogs');
+            const q = query(logsRef, where('sessionId', '==', sessionId), where('adminId', '==', currentUser.uid));
+            const logsSnapshot = await getDocs(q);
+
+            // Fetch session member metadata
+            const metaRef = collection(db, 'sessionMemberData');
+            const metaQuery = query(metaRef, where('sessionId', '==', sessionId), where('adminId', '==', currentUser.uid));
+            const metaSnapshot = await getDocs(metaQuery);
+
+            // Build a map of metadata by uniqueIdentifier
+            const metadataMap = {};
+            metaSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                metadataMap[data.uniqueIdentifier] = data;
+            });
+
+            // Merge attendance logs with metadata
+            const attendanceData = logsSnapshot.docs.map(doc => {
+                const logData = doc.data();
+                const meta = metadataMap[logData.uniqueIdentifier] || {};
+                const rawRow = meta.rawRow || {};
+                
+                return {
+                    name: logData.participantName,
+                    email: logData.email || meta.email || '',
+                    phone: meta.phone || '',
+                    uniqueIdentifier: logData.uniqueIdentifier,
+                    checkInTime: logData.checkInTime?.toDate()?.toLocaleString() || '',
+                    status: 'Present',
+                    ...rawRow // Include all raw CSV fields
+                };
+            });
+
+            if (attendanceData.length === 0) {
+                alert('No attendance data found for this session');
+                return;
+            }
+
+            const worksheet = XLSX.utils.json_to_sheet(attendanceData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+
+            XLSX.writeFile(workbook, `${sessionName}_Attendance.xlsx`);
+        } catch (error) {
+            console.error('Error exporting attendance:', error);
+            alert('Failed to export attendance data');
+        }
+    };
+
+    const viewSessionQRCode = (session) => {
+        setSelectedSession(session);
+        setShowQRModal(true);
+    };
+
+    const closeQRModal = () => {
+        setShowQRModal(false);
+        setSelectedSession(null);
+    };
+
+    const openDeleteModal = (session) => {
+        setSessionToDelete(session);
+        setShowDeleteModal(true);
+    };
+
+    const closeDeleteModal = () => {
+        setShowDeleteModal(false);
+        setSessionToDelete(null);
+    };
+
+    const confirmDeleteSession = async () => {
+        if (!sessionToDelete) return;
+
+        setLoading(true);
+        try {
+            const result = await deleteSession(sessionToDelete.id);
+            console.log(result.message);
+
+            // Update your UI state to remove the deleted session
+            setSessions(prev => prev.filter(session => session.id !== sessionToDelete.id));
+
+            // Show success message to user
+            alert('Session deleted successfully!');
+
+            fetchSessions();
+        } catch (error) {
+            console.error('Failed to delete session:', error);
+
+            // Show error message to user
+            alert(`Failed to delete session: ${error.message}`);
+        } finally {
+            setLoading(false);
+            closeDeleteModal();
+        }
+    };
+
+    const fetchAllSessionParticipants = async () => {
+        try {
+            const participantsRef = collection(db, 'participants');
+            const participantsQuery = query(participantsRef, where('adminId', '==', currentUser.uid));
+            const snapshot = await getDocs(participantsQuery);
+
+            const participantsBySession = {};
+            snapshot.docs.forEach(doc => {
+                const participant = { id: doc.id, ...doc.data() };
+                const sessionId = participant.sessionId;
+                if (!participantsBySession[sessionId]) {
+                    participantsBySession[sessionId] = [];
+                }
+                participantsBySession[sessionId].push(participant);
+            });
+
+            setAllSessionParticipants(participantsBySession);
+        } catch (error) {
+            console.error('Error fetching all session participants:', error);
+        }
+    };
+
+    
+
+    // REMOVED: toggleSessionExpansion - replaced with modal
+    const openParticipantsModal = (session) => {
+        setSelectedSessionForModal(session);
+        setShowParticipantsModal(true);
+    };
+    const closeParticipantsModal = () => {
+        setShowParticipantsModal(false);
+        setSelectedSessionForModal(null);
+        setParticipantsSearchOpen(false);
+        setParticipantsSearchQuery('');
+        setParticipantSearchMatchCount(0);
+        setParticipantHighlightedIds([]);
+        participantRowRefs.current = {};
+
+        if (participantHighlightTimeoutRef.current) {
+            clearTimeout(participantHighlightTimeoutRef.current);
+            participantHighlightTimeoutRef.current = null;
+        }
+    };
+
+    const highlightSearchText = (value, searchTerm) => {
+        const text = String(value ?? '—');
+        const trimmedSearch = searchTerm.trim();
+
+        if (!trimmedSearch) {
+            return text;
+        }
+
+        const safeSearch = trimmedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = text.split(new RegExp(`(${safeSearch})`, 'ig'));
+
+        return parts.map((part, index) =>
+            part.toLowerCase() === trimmedSearch.toLowerCase() ? (
+                <mark key={`${part}-${index}`} className="search-highlight-mark">{part}</mark>
+            ) : (
+                <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>
+            )
+        );
+    };
+
+    const clearParticipantsSearch = () => {
+        setParticipantsSearchQuery('');
+        setParticipantSearchMatchCount(0);
+        setParticipantHighlightedIds([]);
+    };
+
+    const handleParticipantsSearch = () => {
+        const trimmedQuery = participantsSearchQuery.trim().toLowerCase();
+        const sessionParticipants = allSessionParticipants[selectedSessionForModal?.id] || [];
+
+        if (!trimmedQuery) {
+            clearParticipantsSearch();
+            return;
+        }
+
+        const matches = sessionParticipants.filter(participant =>
+            [participant.name, participant.email, participant.phone].some(value =>
+                String(value || '').toLowerCase().includes(trimmedQuery)
+            )
+        );
+
+        const matchIds = matches.map(participant => participant.id);
+        setParticipantSearchMatchCount(matchIds.length);
+        setParticipantHighlightedIds(matchIds);
+
+        if (participantHighlightTimeoutRef.current) {
+            clearTimeout(participantHighlightTimeoutRef.current);
+        }
+
+        if (matchIds.length === 0) {
+            alert(`No participants found for "${participantsSearchQuery}".`);
+            return;
+        }
+
+        const firstMatchRow = participantRowRefs.current[matchIds[0]];
+        if (firstMatchRow) {
+            firstMatchRow.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+        }
+
+        participantHighlightTimeoutRef.current = setTimeout(() => {
+            setParticipantHighlightedIds([]);
+        }, 4000);
+    };
+
+    // REMOVED: unused standalone updateIdentifier - now computed inline in handleEditParticipant
+    // const updateIdentifier = createIdentityKey(
+    //     participant.name,
+    //     editFormData.email,
+    //     editFormData.phone
+    // )
+
+    const handleEditParticipant = async (participantId) => {
+        if (!editFormData.email && !editFormData.phone) {
+            alert('Please provide at least an email or phone number.');
+            return;
+        }
+
+        const participant = Object.values(allSessionParticipants)
+            .flat()
+            .find(p => p.id === participantId);
+
+        if (!participant) {
+            alert('Participant record not found. Please refresh and try again.');
+            return;
+        }
+
+        const normalizedEmail = (editFormData.email || '').trim().toLowerCase();
+        const normalizedPhone = (editFormData.phone || '').trim();
+
+        setLoading(true);
+        try {
+            await updateDoc(doc(db, 'participants', participantId), {
+                email: normalizedEmail,
+                phone: normalizedPhone,
+                uniqueIdentifier: createIdentityKey(
+                    participant.name,
+                    normalizedEmail,
+                    normalizedPhone
+                )
+            });
+
+            // Update the local state
+            setAllSessionParticipants(prev => {
+                const updated = { ...prev };
+                Object.keys(updated).forEach(sessionId => {
+                    updated[sessionId] = updated[sessionId].map(p =>
+                        p.id === participantId ? { ...p, email: normalizedEmail, phone: normalizedPhone } : p
+                    );
+                });
+                return updated;
+            });
+
+            setEditingParticipantId(null);
+            setEditFormData({ email: '', phone: '' });
+            alert('Participant updated successfully!');
+        } catch (error) {
+            console.error('Error updating participant:', error);
+            alert('Failed to update participant');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemoveParticipant = async (participantId) => {
+        setLoading(true);
+        try {
+            await deleteDoc(doc(db, 'participants', participantId));
+
+            // Update the local state
+            setAllSessionParticipants(prev => {
+                const updated = { ...prev };
+                Object.keys(updated).forEach(sessionId => {
+                    updated[sessionId] = updated[sessionId].filter(p => p.id !== participantId);
+                });
+                return updated;
+            });
+
+            alert('Participant removed successfully!');
+        } catch (error) {
+            console.error('Error removing participant:', error);
+            alert('Failed to remove participant');
+        } finally {
+            setLoading(false);
+            closeRemoveModal();
+        }
+    };
+
+    const openRemoveModal = (participant) => {
+        setParticipantToRemove(participant);
+        setShowRemoveModal(true);
+    };
+
+    const closeRemoveModal = () => {
+        setShowRemoveModal(false);
+        setParticipantToRemove(null);
+    };
+
+    const startEditing = (participant) => {
+        setEditingParticipantId(participant.id);
+        setEditFormData({ email: participant.email || '', phone: participant.phone || '' });
+    };
+
+    const cancelEditing = () => {
+        setEditingParticipantId(null);
+        setEditFormData({ email: '', phone: '' });
+    };
+
+    const renderMemberManagement = () => (
+        <>
+            <h2>Member Management</h2>
+            <p>Register and manage members for attendance tracking.</p>
+
+            {/* Member Stats */}
+                <div className="user-stats-row">
+                    <div className="user-stat-card">
+                        <h3>Total Members</h3>
+                        <p>{members.length}</p>
+                    </div>
+                    <div className="user-stat-card">
+                        <h3>Registered This Month</h3>
+                        <p>{members.filter(member =>
+                            new Date(member.createdAt?.toDate()).getMonth() === new Date().getMonth()
+                        ).length}</p>
+                    </div>
+                </div>
+
+            {/* CSV Upload Form */}
+            <div className="admin-db-form-container">
+                <div className="admin-db-form-csv">
+                    <h3>Register Members via CSV</h3> 
+                    <p>Upload a CSV file with columns: <strong>Name, Email & Phone,</strong> and other desired data, then select a Session to register members <strong>(required)</strong></p>
+        
+                    <input
+                        type="file"
+                        accept=".csv,.xlsx,.xls,.word"
+                        onChange={handleCsvUpload}
+                        style={{marginBottom: '10px'}}
+                    />
+                    {csvData.length > 0 && (
+                        <p>Found {csvData.length} rows in the uploaded file.</p>
+                    )}
+                    {csvValidationErrors.length > 0 && (
+                        <div className="admin-db-errors" style={{marginTop: '10px', border: '1px solid #f44336', padding: '10px', borderRadius: '4px', background: '#fff6f6'}}>
+                            <strong style={{color: '#b71c1c'}}>Validation errors:</strong>
+                            <ul style={{marginTop: '6px'}}>
+                                {csvValidationErrors.map((err, idx) => (
+                                    <li key={idx} style={{color: '#333'}}>{err}</li>
+                                ))}
+                            </ul>
+                            <button className="admin-db-delete-btn" onClick={() => setCsvValidationErrors([])} style={{marginTop: '8px'}}>Clear Errors</button>
+                        </div>
+                    )}
+                    <div className="admin-db-btns">
+                        <button
+                            onClick={() => setShowSessionSelectModal(true)}
+                            disabled={!csvData.length || registering}
+                            className="admin-db-open-btn"
+                        >
+                            {registering ? 'Registering...' : 'Register Members'}
+                        </button>
+                        <button
+                            onClick={() => {
+                                setCsvData([]);
+                                setCsvFile(null);
+                            }}
+                            className="admin-db-delete-btn"
+                            disabled={registering}
+                        >
+                            Clear Upload
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Registered Members by Session */}
+            <div className="members-list">
+                <h3>Registered Members for Sessions</h3>
+                {sessions.length === 0 ? (
+                    <p>No sessions created yet.</p>
+                ) : (
+                    sessions.map(session => {
+                        const sessionParticipants = allSessionParticipants[session.id] || [];
+                        return (
+                            <div key={session.id} className="db-section-spacing">
+                                <h4>{session.name} - Registered Members</h4>
+                                <div className="participants-display">
+                                    {sessionParticipants.length === 0 ? (
+                                        <p style={{textAlign: 'center', color: '#666'}}>No participants registered for this session yet.</p>
+                                    ) : (
+                                        <>
+                                            <div className="participant-item">
+                                                <div className="participant-info">
+                                                    <strong>{sessionParticipants[0].name}</strong>
+                                                    {editingParticipantId === sessionParticipants[0].id ? (
+                                                        <>
+                                                            <input
+                                                                type="email"
+                                                                placeholder="Email"
+                                                                value={editFormData.email}
+                                                                onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                                                                style={{marginRight: '10px', padding: '2px 4px'}}
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Phone"
+                                                                value={editFormData.phone}
+                                                                onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+                                                                style={{marginRight: '10px', padding: '2px 4px'}}
+                                                            />
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>{sessionParticipants[0].email}</span>
+                                                            {sessionParticipants[0].phone && <span>Phone: {sessionParticipants[0].phone}</span>}
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <div className="participant-status">
+                                                    <span style={{ color: '#4caf50', fontWeight: 'bold' }}>✓ Registered</span>
+                                                </div>
+                                                <div className="participant-actions">
+                                                    {editingParticipantId === sessionParticipants[0].id ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleEditParticipant(sessionParticipants[0].id)}
+                                                                className="admin-db-open-btn"
+                                                                style={{fontSize: '12px', padding: '4px 8px', marginRight: '5px'}}
+                                                                disabled={loading}
+                                                            >
+                                                                {loading ? 'Saving...' : 'Save'}
+                                                            </button>
+                                                            <button
+                                                                onClick={cancelEditing}
+                                                                className="admin-db-delete-btn"
+                                                                style={{fontSize: '12px', padding: '4px 8px', marginRight: '5px'}}
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => startEditing(sessionParticipants[0])}
+                                                                className="admin-db-open-btn"
+                                                                style={{fontSize: '12px', padding: '4px 8px', marginRight: '5px'}}
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={() => openRemoveModal(sessionParticipants[0])}
+                                                                className="admin-db-delete-btn"
+                                                                style={{fontSize: '12px', padding: '4px 8px'}}
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                             {sessionParticipants.length > 1 && (
+                                                <button 
+                                                    className="admin-db-open-btn" 
+                                                    style={{width: '100%', marginTop: '10px'}}
+                                                    onClick={() => openParticipantsModal(session)}
+                                                >
+                                                    View All {sessionParticipants.length} Participants in Table
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+        </>
+    );
+
+    const renderSessionManagement = () => (
+        <>
+            
+            <div className='session-mang-descrip'>
+                <h2>Session Management</h2>
+            <p>Create and manage attendance sessions with pre-registered participants.</p>
+            </div>
+
+            {/* Create Session Form */}
+            <div className="admin-db-form-container-session">
+                <div className="admin-db-session-form">
+                    <h3>Create New Session</h3>
+                    <form onSubmit={handleSessionSubmit}>
+                        <label htmlFor="sessionName">Session Name:</label>
+                        <input
+                            type="text"
+                            id="sessionName"
+                            value={sessionForm.name}
+                            onChange={(e) => setSessionForm({...sessionForm, name: e.target.value})}
+                            required
+                        />
+
+                        <label htmlFor="sessionDescription">Description:</label>
+                        <textarea
+                            id="sessionDescription"
+                            value={sessionForm.description}
+                            onChange={(e) => setSessionForm({...sessionForm, description: e.target.value})}
+                            rows="3"
+                        />
+
+                        <label htmlFor="sessionLocation">Location:</label>
+                        <input
+                            type="text"
+                            id="sessionLocation"
+                            value={sessionForm.location}
+                            onChange={(e) => setSessionForm({...sessionForm, location: e.target.value})}
+                        />
+
+                        <div style={{display: 'grid', gap: '10px'}}>
+                            <div style={{flex: 1}}>
+                                <label htmlFor="startDate">Start Date & Time:</label>
+                                <input
+                                    type="datetime-local"
+                                    id="startDate"
+                                    value={sessionForm.startDate}
+                                    onChange={(e) => setSessionForm({...sessionForm, startDate: e.target.value})}
+                                    required
+                                />
+                            </div>
+                            <div style={{flex: 1}}>
+                                <label htmlFor="endDate">End Date & Time:</label>
+                                <input
+                                    type="datetime-local"
+                                    id="endDate"
+                                    value={sessionForm.endDate}
+                                    onChange={(e) => setSessionForm({...sessionForm, endDate: e.target.value})}
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <label htmlFor="maxParticipants">Max Participants:</label>
+                        <input
+                            type="number"
+                            id="maxParticipants"
+                            value={sessionForm.maxParticipants}
+                            onChange={(e) => setSessionForm({...sessionForm, maxParticipants: e.target.value})}
+                        />
+                      <div>
+                        <label style={{marginTop: '1.5rem', fontWeight: 'bold', color: '#f44336'}}>Geofence Settings (Optional)</label> <button type="button" className='geofence-default-button' onClick={handleDefaultClick}>Default</button>
+                        <p>: Default automatically selects your <strong>current</strong> location.</p>
+                        
+                        <div style={{display: 'grid', gap: '10px'}}>
+                            <div style={{flex: 1}}>
+                                <label htmlFor="geofenceLat">Latitude:</label>
+                                <input
+                                    type="number"
+                                    id="geofenceLat"
+                                    placeholder="e.g., 40.7128"
+                                    step="0.0001"
+                                    value={sessionForm.geofence?.latitude}
+                                    onChange={(e) => setSessionForm({
+                                        ...sessionForm,
+                                        geofence: {...sessionForm.geofence, latitude: e.target.value}
+                                    })}
+                                />
+                            </div>
+                            <div style={{flex: 1}}>
+                                <label htmlFor="geofenceLng">Longitude:</label>
+                                <input
+                                    type="number"
+                                    id="geofenceLng"
+                                    placeholder="e.g., -74.0060"
+                                    step="0.0001"
+                                    value={sessionForm.geofence?.longitude}
+                                    onChange={(e) => setSessionForm({
+                                        ...sessionForm,
+                                        geofence: {...sessionForm.geofence, longitude: e.target.value}
+                                    })}
+                                />
+                            </div>
+                            <div style={{flex: 1}}>
+                                <label htmlFor="geofenceRadius">Radius (meters):</label>
+                                <input
+                                    type="number"
+                                    id="geofenceRadius"
+                                    placeholder="e.g., 100"
+                                    value={sessionForm.geofence?.radius}
+                                    onChange={(e) => setSessionForm({
+                                        ...sessionForm,
+                                        geofence: {...sessionForm.geofence, radius: e.target.value}
+                                    })}
+                                />
+                            </div>
+                        </div>
+                      </div>
+
+
+                        <div className="admin-db-btns">
+                            <button type="submit" className="admin-db-open-btn" disabled={loading}>
+                                {loading ? 'Creating...' : 'Create Session'}
+                            </button>
+                            <button type="clear" className="admin-db-open-btn" disabled={loading} style={{backgroundColor: 'red'}}>
+                                {loading ? 'Clearing...' : 'Clear'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {/* Existing Sessions */}
+            <div className="sessions-list">
+                <h3>Existing Sessions</h3>
+                {sessions.length === 0 ? (
+                    <p>No sessions created yet.</p>
+                ) : (
+                    sessions.map(session => (
+                        <div key={session.id} className="session-item">
+                            <div className="session-info-box">
+                                <h4>{session.name}</h4>
+                                <p>{session.description}</p>
+                                <p><strong>Location:</strong> {session.location}</p>
+                                <p><strong>Start:</strong> {session.startDate ? new Date(session.startDate).toLocaleString() : 'Not set'}</p>
+                                <p><strong>End:</strong> {session.endDate ? new Date(session.endDate).toLocaleString() : 'Not set'}</p>
+                                <p><strong>Status:</strong> {session.isActive ? 'Active' : 'Inactive'}</p>
+                            </div>
+                            <div className="session-actions-box">
+                                <button
+                                    onClick={() => openDeleteModal(session)}
+                                    className="admin-db-delete-btn"
+                                >
+                                    Delete Session
+                                </button>
+                                <button
+                                    onClick={() => viewSessionQRCode(session)}
+                                    className="admin-db-open-btn"
+                                >
+                                    View QR Code
+                                </button>
+                                <button className='admin-db-status-btn' onClick={() => toggleActive(session.id, session.isActive)}>
+                                    {session.isActive ? 'Deactivate' : 'Activate'}
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </>
+    );
+
+    // ========================================================
+    // MEMBER PROFILE REGISTRATION TO SESSION LOGIC
+    // 
+    // This function registers member profiles (from CSV upload) 
+    // to a specific session by:
+    // 1. Validating each CSV row for required fields
+    // 2. Creating unique identifiers 
+    // 3. Checking for session-specific duplicates in 'participants'
+    // 4. Batch adding to 'participants' collection (sessionId-linked)
+    // 5. Adding metadata to 'sessionMemberData'
+    // 
+    // Called from session selection modal after CSV upload
+    // ========================================================
+    
+    const handleCsvSubmitForSession = async (sessionId) => {
+            if (!csvData.length) {
+                alert('Please upload a CSV file first');
+                return;
+            }
+
+            setRegistering(true);
+            try {
+                const participantsRef = collection(db, 'participants');
+                const metaRef = collection(db, 'sessionMemberData');
+
+                // Build a column map once to avoid O(rows x columns) lookups
+                const columnMap = buildColumnMap(csvData[0] || {});
+
+                // Fetch existing participants for this session to prevent duplicate registrations
+                const existingParticipantsSnapshot = await getDocs(query(participantsRef, where('sessionId', '==', sessionId), where('adminId', '==', currentUser.uid)));
+                const existingParticipantIds = new Set(existingParticipantsSnapshot.docs.map(d => d.data()?.uniqueIdentifier).filter(Boolean));
+
+                let batch = writeBatch(db);
+                let batchWriteCount = 0;
+                const errors = [];
+                const uniqueIdentifiers = new Set();
+                let registeredCount = 0;
+
+                const flushBatchIfNeeded = async () => {
+                    if (batchWriteCount === 0) return;
+                    await batch.commit();
+                    batch = writeBatch(db);
+                    batchWriteCount = 0;
+                };
+
+                for (let i = 0; i < csvData.length; i++) {
+                    const row = csvData[i];
+                    const name = columnMap.name
+                        ? (row[columnMap.name] || '').toString().trim()
+                        : (findColumnValue(row, NAME_FIELDS) || '').toString().trim();
+                    const emailRaw = columnMap.email
+                        ? (row[columnMap.email] || '').toString().trim()
+                        : (findColumnValue(row, EMAIL_FIELDS) || '').toString().trim();
+                    const phoneRaw = columnMap.phone
+                        ? (row[columnMap.phone] || '').toString().trim()
+                        : (findColumnValue(row, PHONE_FIELDS) || '').toString().trim();
+
+                    if (!name || (!emailRaw && !phoneRaw)) {
+                        errors.push(`Row ${i + 1}: Missing required field(s) - Name: ${name || 'missing'}, Email/Phone: ${(!emailRaw && !phoneRaw) ? 'missing' : 'present'}`);
+                        continue;
+                    }
+
+                    const normalizedPhone = (phoneRaw || '').replace(/\D/g, '');
+                    const uniqueId = createIdentityKey(name, emailRaw, normalizedPhone);
+                    if (uniqueIdentifiers.has(uniqueId)) {
+                        errors.push(`Row ${i + 1}: Duplicate identifier for '${name}'`);
+                        continue;
+                    }
+
+                    // Skip if already registered for this session
+                    if (existingParticipantIds.has(uniqueId)) {
+                        errors.push(`Row ${i + 1}: Participant already registered for this session: '${name}'`);
+                        continue;
+                    }
+
+                    uniqueIdentifiers.add(uniqueId);
+
+                    const participantData = {
+                        sessionId: sessionId,
+                        adminId: currentUser.uid,
+                        name,
+                        email: (emailRaw || '').toLowerCase(),
+                        phone: phoneRaw,
+                        uniqueIdentifier: uniqueId,
+                        registeredAt: new Date(),
+                        status: 'registered'
+                    };
+
+                    const participantDocRef = doc(participantsRef);
+                    batch.set(participantDocRef, participantData);
+
+                    const meta = {
+                        sessionId: sessionId,
+                        adminId: currentUser.uid,
+                        uniqueIdentifier: uniqueId,
+                        name,
+                        email: (emailRaw || '').toLowerCase(),
+                        phone: phoneRaw,
+                        rawRow: row,
+                        registeredAt: new Date()
+                    };
+                    const metaDocRef = doc(metaRef);
+                    batch.set(metaDocRef, meta);
+
+                    batchWriteCount += 2;
+                    registeredCount += 1;
+                    existingParticipantIds.add(uniqueId);
+
+                    // Firestore write batches max out at 500 operations.
+                    if (batchWriteCount >= 450) {
+                        await flushBatchIfNeeded();
+                    }
+                }
+
+                if (errors.length > 0) {
+                    setSessionValidationErrors(errors);
+                    alert(`Validation errors found:\n${errors.join('\n')}\n\nOnly valid participants will be registered.`);
+                }
+
+                await flushBatchIfNeeded();
+
+                if (registeredCount > 0) {
+                    alert(`Successfully registered ${registeredCount} participants for the selected session!`);
+                    fetchSessions(); // Refresh session data if needed
+                } else {
+                    alert('No valid participants to register.');
+                }
+
+                setCsvData([]);
+                setCsvFile(null);
+                setSelectedSessionId(null);
+                setSessionValidationErrors([]);
+            } catch (error) {
+                console.error('Error registering participants:', error);
+                alert('Failed to register participants');
+            } finally {
+                setRegistering(false);
+            }
+        };
+
+
+    const renderSessionDashboard = () => (
+        <>
+            <h2>Session Dashboard</h2>
+            <p>Real-time monitoring of session attendance.</p>
+
+            {/* Stats Cards */}
+            <div className="user-stats-row">
+                <div className="user-stat-card">
+                    <h3>Active Sessions</h3>
+                    <p>{sessions.filter(s => s.isActive).length}</p>
+                </div>
+                <div className="user-stat-card">
+                    <h3>Total Check-ins Today</h3>
+                    <p>{attendanceLogs.filter(log =>
+                        new Date(log.checkInTime?.toDate()).toDateString() === new Date().toDateString()
+                    ).length}</p>
+                </div>
+                <div className="user-stat-card">
+                    <h3>Total Sessions</h3>
+                    <p>{sessions.length}</p>
+                </div>
+            </div>
+        </>
+    );
+
+    const renderParticipantsTableModal = () => {
+        if (!selectedSessionForModal || !showParticipantsModal) return null;
+
+        const sessionParticipants = allSessionParticipants[selectedSessionForModal.id] || [];
+
+        return (
+            <div className="qr-modal-overlay" onClick={closeParticipantsModal}>
+                <div className="qr-modal-content" style={{maxWidth: '95vw', maxHeight: '90vh', width: '1200px'}} onClick={(e) => e.stopPropagation()}>
+                    <div className="qr-modal-header">
+                        <h2>{selectedSessionForModal.name} - All Participants ({sessionParticipants.length})</h2>
+                        <button className="qr-modal-close" onClick={closeParticipantsModal}>×</button>
+                    </div>
+                    <div className="qr-modal-body participants-modal-body" style={{ overflowX: 'auto', overflowY: 'auto' }}>
+                        <div className="participants-search-toolbar">
+                            <button
+                                type="button"
+                                className="participants-search-icon-btn"
+                                onClick={() => setParticipantsSearchOpen(prev => !prev)}
+                                title="Search participants"
+                                aria-label="Search participants"
+                            >
+                                <svg viewBox="0 0 20 20" aria-hidden="true" className="search-icon-svg">
+                                    <circle cx="8.5" cy="8.5" r="4.75" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                                    <path d="M12 12l4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                </svg>
+                            </button>
+                            <p>search</p>
+
+                            {participantsSearchOpen && (
+                                <div className="participants-search-controls">
+                                    <input
+                                        type="text"
+                                        value={participantsSearchQuery}
+                                        onChange={(e) => setParticipantsSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleParticipantsSearch();
+                                            }
+                                        }}
+                                        className="participants-search-input"
+                                        placeholder="Search by name, email, or phone"
+                                    />
+                                    <button type="button" className="admin-db-open-btn" onClick={handleParticipantsSearch}>
+                                        Search
+                                    </button>
+                                    <button type="button" className="admin-db-delete-btn" onClick={clearParticipantsSearch}>
+                                        Clear
+                                    </button>
+                                    {participantsSearchQuery.trim() && (
+                                        <span className="participants-search-status">
+                                            {participantSearchMatchCount} match{participantSearchMatchCount === 1 ? '' : 'es'}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="participants-horizontal-scroll">
+                            <table className="participants-modal-table" style={{ borderCollapse: 'collapse', fontSize: '14px' }}>
+                                <thead>
+                                    <tr style={{backgroundColor: '#f5f5f5'}}>
+                                        <th style={{padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold'}}>Name</th>
+                                        <th style={{padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold'}}>Email</th>
+                                       <th style={{padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold'}}>Phone</th>
+                                        <th style={{padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid #ddd', fontWeight: 'bold', minWidth: '150px'}}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sessionParticipants.map(participant => (
+                                        <tr
+                                            key={participant.id}
+                                            ref={(el) => {
+                                                if (el) {
+                                                    participantRowRefs.current[participant.id] = el;
+                                                }
+                                            }}
+                                            className={participantHighlightedIds.includes(participant.id) ? 'participant-search-match' : ''}
+                                            style={{borderBottom: '1px solid #eee'}}
+                                        >
+                                            <td style={{padding: '12px 8px', fontWeight: '500'}}>{highlightSearchText(participant.name || '—', participantsSearchQuery)}</td>
+                                            <td style={{padding: '12px 8px'}}>{editingParticipantId === participant.id ? (
+                                                <input
+                                                    type="email"
+                                                    value={editFormData.email}
+                                                    onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                                                    style={{width: '100%', padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px'}}
+                                                    placeholder="Email"
+                                                />
+                                            ) : highlightSearchText(participant.email || '—', participantsSearchQuery)}</td>
+                                            <td style={{padding: '12px 8px'}}>{editingParticipantId === participant.id ? (
+                                                <input
+                                                    type="text"
+                                                    value={editFormData.phone}
+                                                    onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+                                                    style={{width: '100%', padding: '4px 8px', border: '1px solid #ddd', borderRadius: '4px'}}
+                                                    placeholder="Phone"
+                                                />
+                                            ) : highlightSearchText(participant.phone || '—', participantsSearchQuery)}</td>
+                                            <td style={{padding: '12px 8px', textAlign: 'center'}}>
+                                                {editingParticipantId === participant.id ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleEditParticipant(participant.id)}
+                                                            className="admin-db-open-btn"
+                                                            style={{fontSize: '12px', padding: '6px 12px', marginRight: '6px', minWidth: '60px'}}
+                                                            disabled={loading}
+                                                        >
+                                                            {loading ? 'Saving...' : 'Save'}
+                                                        </button>
+                                                        <button
+                                                            onClick={cancelEditing}
+                                                            className="admin-db-delete-btn"
+                                                            style={{fontSize: '12px', padding: '6px 12px', minWidth: '60px'}}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => startEditing(participant)}
+                                                            className="admin-db-open-btn"
+                                                            style={{fontSize: '12px', padding: '6px 12px', marginRight: '6px', minWidth: '50px'}}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => openRemoveModal(participant)}
+                                                            className="admin-db-delete-btn"
+                                                            style={{fontSize: '12px', padding: '6px 12px', minWidth: '60px'}}
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div>
+            {registering && (
+                <div className="registering-overlay">
+                    <div className="registering-box">
+                        <div className="registering-spinner" />
+                        <p>Registering members... Please wait.</p>
+                    </div>
+                </div>
+            )}
+            {/* Tab Navigation */}
+            <div className="tab-navigation">
+                <button
+                    className={activeTab === 'members' ? 'active' : ''}
+                    onClick={() => setActiveTab('members')}
+                >
+                    Member Management
+                </button>
+                <button
+                    className={activeTab === 'sessions' ? 'active' : ''}
+                    onClick={() => setActiveTab('sessions')}
+                >
+                    Session Management
+                </button>
+                <button
+                    className={activeTab === 'dashboard' ? 'active' : ''}
+                    onClick={() => setActiveTab('dashboard')}
+                >
+                    Session Dashboard
+                </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="tab-content">
+                {activeTab === 'members' && renderMemberManagement()}
+                {activeTab === 'sessions' && renderSessionManagement()}
+            {activeTab === 'dashboard' && renderSessionDashboard()}
+            </div>
+
+            {/* NEW Participants Table Modal */}
+            {renderParticipantsTableModal()}
+
+            {/* QR Code Modal */}
+            {showQRModal && selectedSession && (
+                <div className="qr-modal-overlay" onClick={closeQRModal}>
+                    <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="qr-modal-header">
+                            <h2>{selectedSession.name} - QR Code</h2>
+                            <button className="qr-modal-close" onClick={closeQRModal}>×</button>
+                        </div>
+                        <div className="qr-modal-body">
+                        {sessionValidationErrors.length > 0 && (
+                            <div className="admin-db-errors" style={{marginBottom: '12px', border: '1px solid #f44336', padding: '10px', borderRadius: '4px', background: '#fff6f6'}}>
+                                <strong style={{color: '#b71c1c'}}>Validation errors:</strong>
+                                <ul style={{marginTop: '6px'}}>
+                                    {sessionValidationErrors.map((err, idx) => (
+                                        <li key={idx} style={{color: '#333'}}>{err}</li>
+                                    ))}
+                                </ul>
+                                <button className="admin-db-delete-btn" onClick={() => setSessionValidationErrors([])} style={{marginTop: '8px'}}>Clear Errors</button>
+                            </div>
+                        )}
+                            <div className="qr-code-display">
+                                <QRCode
+                                    value={`${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${selectedSession.id}`}
+                                    size={200}
+                                />
+                            </div>
+                            <div className="qr-details">
+                                <p><strong>Session:</strong> {selectedSession.name}</p>
+                                <p><strong>Description:</strong> {selectedSession.description || 'No description'}</p>
+                                <p><strong>Location:</strong> {selectedSession.location || 'Not specified'}</p>
+                                <p><strong>Start:</strong> {selectedSession.startDate ? new Date(selectedSession.startDate).toLocaleString() : 'Not set'}</p>
+                                <p><strong>End:</strong> {selectedSession.endDate ? new Date(selectedSession.endDate).toLocaleString() : 'Not set'}</p>
+                                <p><strong>Status:</strong> {selectedSession.isActive ? 'Active' : 'Inactive'}</p>
+                                <p><strong>URL:</strong> <a href={`${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${selectedSession.id}`} target="_blank" rel="noopener noreferrer">
+                                    {`${window.location.origin}${import.meta.env.BASE_URL}session-checkin/${selectedSession.id}`}
+                                </a></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+           {showSessionSelectModal && (
+    <div className="qr-modal-overlay" onClick={() => setShowSessionSelectModal(false)}>
+        <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="qr-modal-header">
+                <h2>Select Session for Member Registration</h2>
+                <button className="qr-modal-close" onClick={() => setShowSessionSelectModal(false)}>×</button>
+            </div>
+            <div className="qr-modal-body">
+                {sessions.length === 0 ? (
+                    <p>No sessions available. Please create a session first.</p>
+                ) : (
+                    <div className="session-selection-list">
+                        {sessions.map(session => (
+                            <div 
+                                key={session.id} 
+                                className={`session-selection-item ${selectedSessionId === session.id ? 'selected' : ''}`}
+                                onClick={() => setSelectedSessionId(session.id)}
+                            >
+                                <h4>{session.name}</h4>
+                                <p>{session.description}</p>
+                                <p><strong>Location:</strong> {session.location}</p>
+                                <p><strong>Date:</strong> {new Date(session.startDate).toLocaleDateString()}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                <div className="admin-db-btns" style={{marginTop: '20px'}}>
+                    <button
+                        onClick={() => setShowSessionSelectModal(false)}
+                        className="admin-db-open-btn"
+                        disabled={registering}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (selectedSessionId) {
+                                handleCsvSubmitForSession(selectedSessionId);
+                                setShowSessionSelectModal(false);
+                            }
+                        }}
+                        className="admin-db-open-btn"
+                        disabled={!selectedSessionId || registering}
+                    >
+                        {registering ? 'Registering...' : 'Confirm Registration'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && sessionToDelete && (
+                <div className="qr-modal-overlay" onClick={closeDeleteModal}>
+                    <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="qr-modal-header">
+                            <h2>Delete Session</h2>
+                            <button className="qr-modal-close" onClick={closeDeleteModal}>×</button>
+                        </div>
+                        <div className="qr-modal-body">
+                            <div className="delete-confirmation">
+                                <p><strong>Are you sure you want to delete this session?</strong></p>
+                                <div className="delete-session-details">
+                                    <p><strong>Session:</strong> {sessionToDelete.name}</p>
+                                    <p><strong>Description:</strong> {sessionToDelete.description || 'No description'}</p>
+                                    <p><strong>Location:</strong> {sessionToDelete.location || 'Not specified'}</p>
+                                </div>
+                                <div className="delete-warning">
+                                    <p style={{color: 'red', fontWeight: 'bold'}}>
+                                        ⚠️ Warning: This action cannot be undone. All attendance data associated with this session will also be permanently deleted.
+                                    </p>
+                                </div>
+                                <div className="admin-db-btns" style={{marginTop: '20px'}}>
+                                    <button
+                                        onClick={closeDeleteModal}
+                                        className="admin-db-open-btn"
+                                        disabled={loading}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={confirmDeleteSession}
+                                        className="admin-db-delete-btn"
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'Deleting...' : 'Delete Session'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Remove Participant Confirmation Modal */}
+            {showRemoveModal && participantToRemove && (
+                <div className="qr-modal-overlay" onClick={closeRemoveModal}>
+                    <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="qr-modal-header">
+                            <h2>Remove Participant</h2>
+                            <button className="qr-modal-close" onClick={closeRemoveModal}>×</button>
+                        </div>
+                        <div className="qr-modal-body">
+                            <div className="delete-confirmation">
+                                <p><strong>Are you sure you want to remove this participant?</strong></p>
+                                <div className="delete-session-details">
+                                    <p><strong>Name:</strong> {participantToRemove.name}</p>
+                                    <p><strong>Email:</strong> {participantToRemove.email || 'Not provided'}</p>
+                                    <p><strong>Phone:</strong> {participantToRemove.phone || 'Not provided'}</p>
+                                </div>
+                                <div className="delete-warning">
+                                    <p style={{color: 'red', fontWeight: 'bold'}}>
+                                        ⚠️ Warning: This action cannot be undone. The participant will be permanently removed from this session.
+                                    </p>
+                                </div>
+                                <div className="admin-db-btns" style={{marginTop: '20px'}}>
+                                    <button
+                                        onClick={closeRemoveModal}
+                                        className="admin-db-open-btn"
+                                        disabled={loading}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => handleRemoveParticipant(participantToRemove.id)}
+                                        className="admin-db-delete-btn"
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'Removing...' : 'Remove Participant'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default AdminUsers;

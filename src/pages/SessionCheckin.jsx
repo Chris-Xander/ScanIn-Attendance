@@ -1,0 +1,603 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { db } from '../firebase/config';
+import { collection, doc, getDoc, query, where, getDocs, setDoc, writeBatch } from 'firebase/firestore';
+import { submitAttendance } from '../utility/attendanceManager';
+import { getDeviceId } from '../utility/deviceFingerprint';
+import { parsePhoneNumber } from 'libphonenumber-js';
+import './SessionCheckin.css';
+
+const normalizePhone = (phone) => {
+    if (!phone) return '';
+    try {
+        const phoneNumber = parsePhoneNumber(phone, 'US');
+        if (phoneNumber.isValid()) {
+            return phoneNumber.format('E164');
+        } else {
+            return phone.replace(/\D/g, '');
+        }
+    } catch {
+        return phone.replace(/\D/g, '');
+    }
+};
+
+function SessionCheckin() {
+    const { sessionId } = useParams();
+    const navigate = useNavigate();
+    const [session, setSession] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [checkinForm, setCheckinForm] = useState({
+        name: '',
+        email: '',
+        phone: ''
+    });
+const [checkingIn, setCheckingIn] = useState(false);
+    const [message, setMessage] = useState('');
+    const [error, setError] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+    const [modalType, setModalType] = useState(null);
+    const [participant, setParticipant] = useState(null);
+    const [isRegistered, setIsRegistered] = useState(false);
+    const [checkingRegistration, setCheckingRegistration] = useState(false);
+    const [deviceRecognized, setDeviceRecognized] = useState(false);
+    const [registrationChecked, setRegistrationChecked] = useState(false);
+    const [recognizedEmail, setRecognizedEmail] = useState('');
+    const [hasCheckedEmail, setHasCheckedEmail] = useState(false);
+    const createIdentityKey = (name, email, contact) => {
+        const n = (name || '').trim().toLowerCase();
+        const e = (email || '').trim().toLowerCase();
+        const p = (contact || '').replace(/\D/g, '');
+
+        if (e) {
+            return `${n}|${e}`;
+        }
+
+        if (p) {
+            return `${n}|${p}`;
+        }
+
+        return null; // No valid identifier available
+    };
+
+    useEffect(() => {
+        fetchSession();
+        recognizeDevice();
+    }, [sessionId]);
+
+    // Auto-check registration when email changes (debounced)
+    useEffect(() => {
+        if (
+            hasCheckedEmail ||
+            !checkinForm.email?.trim() || 
+            checkingRegistration) return;
+
+        const timeoutId = setTimeout(async () => {
+            await checkParticipantRegistration(checkinForm.email.trim());
+            setHasCheckedEmail(true);
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
+    }, [checkinForm.email, sessionId, hasCheckedEmail]);
+
+    useEffect(() => {
+            // Show loading modal on initial load
+            if (loading && !error) {
+                setShowModal(true);
+                setModalType('loading');
+            } else if (!loading && !error) {
+                // Loading finished successfully, hide modal
+                setShowModal(false);
+                setModalType(null);
+            }
+        }, [loading, error]);
+
+    const fetchSession = async () => {
+        try {
+            const sessionDoc = await getDoc(doc(db, 'sessions', sessionId));
+            if (sessionDoc.exists()) {
+                const sessionData = { id: sessionDoc.id, ...sessionDoc.data() };
+                setSession(sessionData);
+            } else {
+                setMessage('Session not found');
+            }
+        } catch (error) {
+            console.error('Error fetching session:', error);
+            setMessage('Error loading session');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const FeedbackModal = () => {
+		if (!showModal) return null;
+
+		const handleModalClose = () => {
+			if (modalType === 'success') {
+				navigate('/');
+				setCheckinForm({ name: '', email: '', phone: '' });
+			} else {
+				setShowModal(false);
+				setModalType(null);
+				setError(null);
+			}
+		};
+
+		const getModalContent = () => {
+			switch (modalType) {
+				case 'loading':
+					return {
+						title: 'Loading...',
+						message: 'Please wait while we process your request.',
+						icon: '⏳',
+						showButton: false
+					};
+				case 'error':
+					return {
+						title: 'Error',
+						message: error,
+						icon: '❌',
+						showButton: true,
+						buttonText: 'Try Again'
+					};
+				case 'success':
+					return {
+						title: 'Success!',
+						message: 'Attendance recorded successfully.',
+						icon: '✅',
+						showButton: true,
+						buttonText: 'Done'
+					};
+				default:
+					return { title: '', message: '', icon: '', showButton: false };
+			}
+		};
+
+		const content = getModalContent();
+
+		return (
+			<div className="scanform-modal-overlay">
+				<div className={`scanform-modal scanform-modal-${modalType}`}>
+					<div className="scanform-modal-icon">{content.icon}</div>
+					<h2 className="scanform-modal-title">{content.title}</h2>
+					<p className="scanform-modal-message">{content.message}</p>
+					{content.showButton && (
+						<button className="scanform-modal-button" onClick={handleModalClose}>
+							{content.buttonText}
+						</button>
+					)}
+					{!content.showButton && modalType === 'loading' && (
+						<div className="scanform-spinner"></div>
+					)}
+				</div>
+			</div>
+		);
+	};
+
+    const checkParticipantRegistration = async (email) => {
+        if (!email || !session) return;
+
+        setCheckingRegistration(true);
+        setMessage('');
+        try {
+            const participantsQuery = query(
+                collection(db, 'participants'),
+                where('sessionId', '==', sessionId),
+                where('email', '==', email.toLowerCase())
+            );
+            const participantSnapshot = await getDocs(participantsQuery);
+
+            if (!participantSnapshot.empty) {
+                const participantData = participantSnapshot.docs[0].data();
+                setParticipant(participantData);
+                setIsRegistered(true);
+                setCheckinForm({
+                    name: participantData.name || '',
+                    email: participantData.email || '',
+                    phone: participantData.phone || ''
+                });
+                setMessage('Welcome ✓ You are pre-registered for this session. Your details have been auto-filled.');
+            } else {
+                setIsRegistered(false);
+                setParticipant(null);
+                setMessage('You are not registered for this session.');
+            }
+        } catch (error) {
+            console.error('Error checking participant registration:', error);
+            setMessage('Error checking registration status. Please try again.');
+            setIsRegistered(false);
+            setParticipant(null);
+        } finally {
+            setCheckingRegistration(false);
+        }
+    };
+
+    const handleCheckin = async (e) => {
+        e.preventDefault();
+        if (!checkinForm.name || !checkinForm.email) {
+            setMessage('Please fill in all required fields');
+            return;
+        }
+
+        setCheckingIn(true);
+        setMessage('');
+
+        const normalizedPhone = normalizePhone(checkinForm.phone);
+
+        try {
+            // Check if session has expired
+            const now = new Date();
+            const sessionEndDate = session.endDate ? new Date(session.endDate) : null;
+
+            if (sessionEndDate && now > sessionEndDate) {
+                setMessage('This session has expired. Check-in is no longer available.');
+                return;
+            }
+
+            // Get device ID and create unique identifier
+            const deviceId = getCookie('scanin_device_id') || await getDeviceId();
+            const userEmail = checkinForm.email.toLowerCase();
+            const uniqueId = createIdentityKey(checkinForm.name, userEmail, normalizedPhone);
+
+            // Parallelize: Check device binding and existing attendance
+            const bindingRef = doc(db, "sessionDeviceBindings", `${sessionId}_${deviceId}`);
+            const attendanceQuery = query(
+                collection(db, 'attendanceRecords'),
+                where('sessionId', '==', sessionId),
+                where('email', '==', userEmail)
+            );
+
+            const [bindingSnap, attendanceSnapshot] = await Promise.all([
+                getDoc(bindingRef),
+                getDocs(attendanceQuery)
+            ]);
+
+            // Check device binding
+            if (bindingSnap.exists()) {
+                const existingBinding = bindingSnap.data();
+                if (existingBinding.uniqueIdentifier !== uniqueId) {
+                    setMessage("This device has already been used by another attendee.");
+                    setCheckingIn(false);
+                    return;
+                }
+                // Same user → allow multiple check-ins
+            } else {
+                // First time → bind device to this identity
+                await setDoc(bindingRef, {
+                    sessionId,
+                    deviceId,
+                    uniqueIdentifier: uniqueId,
+                    name: checkinForm.name,
+                    email: userEmail,
+                    phone: normalizedPhone,
+                    boundAt: new Date()
+                });
+            }
+
+            // Check if user has checked in recently (optional, can be removed if not needed)
+            if (!attendanceSnapshot.empty) {
+                const lastCheckin = attendanceSnapshot.docs
+                    .sort((a, b) => b.data().checkInTime.toDate() - a.data().checkInTime.toDate())[0];
+
+                const lastCheckinTime = lastCheckin.data().checkInTime.toDate();
+                const now = new Date();
+                const hoursSinceLastCheckin = (now - lastCheckinTime) / (1000 * 60 * 60);
+
+               
+                 if (hoursSinceLastCheckin < 6) {
+                     const remainingHours = Math.ceil(6 - hoursSinceLastCheckin);
+                     setMessage(`Looks like you've already been checked in. To checkin again wait ${remainingHours} hours`);
+                     setCheckingIn(false); 
+                     return;
+                 }
+            }
+
+            // Create attendance record
+            const uniqueCode = generateUniqueCode();
+            await submitAttendance({
+                memberId: participant?.memberId || null,
+                sessionId,
+                deviceToken: deviceId,
+                captureLocation: true,
+                memberName: checkinForm.name,
+                email: userEmail,
+                phone: normalizedPhone,
+                extra: {
+                    participantId: participant?.id || null,
+                    participantName: checkinForm.name,
+                    uniqueCode,
+                    adminId: session.adminId,
+                    sessionName: session.name,
+                    status: 'present'
+                }
+            });
+
+            // Save device recognition
+            await saveDeviceRecognition(userEmail);
+
+            setMessage('Check-in successful! Welcome to the session.');
+            setCheckinForm({ name: '', email: '', phone: '' });
+            setModalType('success');
+            setShowModal(true);
+        } catch (error) {
+            console.error('Error during check-in:', error);
+            setError(error.message || 'Check-in failed. Please try again.');
+            setModalType('error');
+            setShowModal(true);
+            setMessage(error.message || 'Check-in failed. Please try again.');
+        } finally {
+            setCheckingIn(false);
+        }
+    };
+
+    const generateUniqueCode = () => {
+        return Math.random().toString(36).substr(2, 9).toUpperCase();
+    };
+
+    // Device Recognition Functions
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    };
+
+    const setCookie = (name, value, days = 365) => {
+        const expires = new Date();
+        expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+        document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+    };
+
+    const generateFingerprint = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.textBaseline = 'top';
+        ctx.font = '14px Arial';
+        ctx.fillText('Fingerprint', 2, 2);
+
+        const fingerprint = {
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            platform: navigator.platform,
+            cookieEnabled: navigator.cookieEnabled,
+            screenResolution: `${screen.width}x${screen.height}`,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            canvas: canvas.toDataURL().substring(0, 50)
+        };
+
+        return btoa(JSON.stringify(fingerprint)).substring(0, 32);
+    };
+
+    const recognizeDevice = async () => {
+        // 1. Primary: Check cookie
+        let deviceId = getCookie('scanin_device_id');
+        let email = getCookie('scanin_user_email');
+
+        if (deviceId && email) {
+            // Verify device still exists in database
+            try {
+                const deviceDoc = await getDoc(doc(db, 'devices', deviceId));
+                if (deviceDoc.exists()) {
+                    setDeviceRecognized(true);
+                    setRecognizedEmail(email);
+                    setCheckinForm(prev => ({ ...prev, email }));
+                    await checkParticipantRegistration(email);
+                    setRegistrationChecked(true);
+                    return;
+                }
+            } catch (error) {
+                console.error('Error verifying device:', error);
+            }
+        }
+
+        // 2. Check localStorage backup
+        if (!deviceId) {
+            deviceId = localStorage.getItem('scanin_device_id');
+            email = localStorage.getItem('scanin_user_email');
+            if (deviceId && email) {
+                setCookie('scanin_device_id', deviceId);
+                setCookie('scanin_user_email', email);
+                setDeviceRecognized(true);
+                setRecognizedEmail(email);
+                setCheckinForm(prev => ({ ...prev, email }));
+                await checkParticipantRegistration(email);
+                setRegistrationChecked(true);
+                return;
+            }
+        }
+
+        // 3. Fingerprint fallback (generate fresh ID)
+        deviceId = await getDeviceId();
+        setCookie('scanin_device_id', deviceId);
+        localStorage.setItem('scanin_device_id', deviceId);
+    };
+
+    const saveDeviceRecognition = async (email) => {
+        const deviceId = await getDeviceId();
+        const fingerprint = generateFingerprint();
+
+        try {
+            await setDoc(doc(db, 'devices', deviceId), {
+                email: email.toLowerCase(),
+                fingerprint,
+                lastSeen: new Date(),
+                userAgent: navigator.userAgent,
+                createdAt: new Date()
+            }, { merge: true });
+
+            setCookie('scanin_device_id', deviceId);
+            setCookie('scanin_user_email', email);
+            localStorage.setItem('scanin_device_id', deviceId);
+            localStorage.setItem('scanin_user_email', email);
+
+            setDeviceRecognized(true);
+            setRecognizedEmail(email);
+        } catch (error) {
+            console.error('Error saving device recognition:', error);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="session-checkin-container">
+                <div className="loading">Loading session...</div>
+            </div>
+        );
+    }
+
+    if (!session) {
+        return (
+            <div className="session-checkin-container">
+                <div className="error-message">{message}</div>
+                <button onClick={() => navigate('/')} className="back-btn">Back to Home</button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="session-checkin-container">
+            {checkingIn && (
+                <div className="checking-in-overlay">
+                    <div className="checking-in-box">
+                        <div className="checking-in-spinner" />
+                        <p>Checking you in... Please wait.</p>
+                    </div>
+                </div>
+            )}
+            <div className="session-checkin-card">
+                <h1>{session.name}</h1>
+                {session.description && <p className="session-description">{session.description}</p>}
+
+                <div className="session-details">
+                    <div className="detail-item">
+                        <strong>Location:</strong> {session.location || 'Not specified'}
+                    </div>
+                    <div className="detail-item">
+                        <strong>Start:</strong> {session.startDate ? new Date(session.startDate).toLocaleString() : 'Not set'}
+                    </div>
+                    <div className="detail-item">
+                        <strong>End:</strong> {session.endDate ? new Date(session.endDate).toLocaleString() : 'Not set'}
+                    </div>
+                    <div className="detail-item">
+                        <strong>Status:</strong> {session.isActive ? 'Active' : 'Inactive'}
+                    </div>
+                </div>
+
+                {!session.isActive && (
+                    <div className="inactive-session">
+                        This session is currently inactive. Check-in is not available.
+                    </div>
+                )}
+
+{session.isActive && (
+                    <div className="checkin-section">
+                        <FeedbackModal />
+                        
+                        {/* Always visible email input + status */}
+                        <div className="registration-check">
+                            <h2>Check Registration</h2>
+                            {deviceRecognized && (
+                                <div className="device-recognition-notice">
+                                    <div className="registration-status success">
+                                        🔄 Welcome back! Device recognized.
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="form-group">
+                                <label htmlFor="checkEmail">Email Address *</label>
+                                <input
+                                    type="email"
+                                    id="checkEmail"
+                                    value={checkinForm.email}
+                                    onChange={(e) => setCheckinForm({ ...checkinForm, email: e.target.value })}
+                                    placeholder="your.email@example.com"
+                                    disabled={checkingRegistration}
+                                />
+                            </div>
+
+                            {checkingRegistration && (
+                                <div className="registration-status info">
+                                    🔍 Checking registration...
+                                </div>
+                                
+                            )}
+                                                        <button
+                                type="button"
+                                className="check-email-btn"
+                                onClick={() => {
+                                    checkParticipantRegistration(checkinForm.email.trim());
+                                    setRegistrationChecked(true);
+                                }}
+                                disabled={!checkinForm.email.trim() || checkingRegistration}
+                            >
+                                {checkingRegistration ? 'Checking...' : 'Check Email'}
+                            </button>
+                        </div>
+
+                        {/* Registration result + conditional form */}
+                        {message && (
+                            <div className={`registration-status ${isRegistered ? 'success' : 'error'}`}>
+                                {message}
+                            </div>
+                        )}
+
+                        {/* Pre-filled form if registered */}
+                        {isRegistered && participant && (
+                            <form onSubmit={handleCheckin} className="checkin-form">
+                                <h2>Check In</h2>
+                                <div className="form-group">
+                                    <label htmlFor="name">Full Name *</label>
+                                    <input
+                                        type="text"
+                                        id="name"
+                                        value={checkinForm.name}
+                                        onChange={(e) => setCheckinForm({ ...checkinForm, name: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="phone">Phone (Optional)</label>
+                                    <input
+                                        type="tel"
+                                        id="phone"
+                                        value={checkinForm.phone}
+                                        onChange={(e) => setCheckinForm({ ...checkinForm, phone: e.target.value })}
+                                    />
+                                </div>
+                                <button type="submit" disabled={checkingIn} className="checkin-btn">
+                                    {checkingIn ? 'Checking In...' : 'Check In'}
+                                </button>
+                            </form>
+                        )}
+
+                        {/* Reset button for retry */}
+                        {message && !isRegistered && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setMessage('');
+                                    setIsRegistered(false);
+                                    setParticipant(null);
+                                }}
+                                className="back-btn"
+                                style={{ marginTop: '10px' }}
+                            >
+                                Try Different Email
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {message && (
+                    <div className={`message ${message.includes('successful') ? 'success' : 'error'}`}>
+                        {message}
+                    </div>
+                )}
+
+                <button onClick={() => navigate('/')} className="back-btn">Back to Home</button>
+            </div>
+        </div>
+    );
+}
+
+export default SessionCheckin;

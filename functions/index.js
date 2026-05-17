@@ -1,0 +1,654 @@
+/* eslint-env node */
+const { setGlobalOptions } = require('firebase-functions/v2');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const logger = require('firebase-functions/logger');
+const admin = require('firebase-admin');
+const crypto = require('crypto'); // Node built-in
+const QRCodeReader = require('qrcode-reader'); 
+
+function isAdmin(decoded) {
+  return !!decoded.admin;
+}
+
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY;
+
+admin.initializeApp();
+setGlobalOptions({ maxInstances: 10, region: 'us-central1' });
+
+// Allowed origins for CORS (use HTTP endpoint from client)
+const CORS_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  'http://localhost:5176',
+  'https://chris-xander.github.io',
+  'https://attendance-app-3efdc.web.app',
+  'https://attendance-app-3efdc.firebaseapp.com',
+];
+
+const BATCH_SIZE = 500; // Firestore batch limit
+
+async function countSessionDocs(db, sessionId) {
+  const logsQ = db.collection('attendanceLogs').where('sessionId', '==', sessionId);
+  const recordsQ = db.collection('attendanceRecords').where('sessionId', '==', sessionId);
+  const [logsSnap, recSnap] = await Promise.all([logsQ.get(), recordsQ.get()]);
+  return logsSnap.size + recSnap.size;
+}
+
+async function deleteChunkFrom(db, col, sessionId) {
+  const q = db.collection(col).where('sessionId', '==', sessionId).limit(BATCH_SIZE);
+  const snap = await q.get();
+  if (snap.empty) return 0;
+  const batch = db.batch();
+  snap.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+  return snap.size;
+}
+
+async function deleteAllDocsForSession(db, sessionId) {
+  let deleted = 0;
+  while (true) {
+    const deletedFromLogs = await deleteChunkFrom(db, 'attendanceLogs', sessionId);
+    const deletedFromRecords = await deleteChunkFrom(db, 'attendanceRecords', sessionId);
+    const totalDeletedThisIteration = deletedFromLogs + deletedFromRecords;
+    if (!totalDeletedThisIteration) break;
+    deleted += totalDeletedThisIteration;
+    // small delay to reduce hot-looping
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  /* eslint-enable no-constant-condition */
+
+  // finally delete the session doc
+  await db.collection('sessions').doc(sessionId).delete();
+  return deleted;
+}
+
+async function enqueueDeletionJob(db, sessionId, requestedBy, totalCount) {
+  const jobRef = db.collection('deletionJobs').doc();
+  const job = {
+    sessionId,
+    requestedBy,
+    status: 'pending',
+    totalCount,
+    processedCount: 0,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  await jobRef.set(job);
+  return jobRef.id;
+}
+
+function setCors(res, origin) {
+  // Exact match or wildcard for dev
+  if (origin && (origin.includes('localhost') || CORS_ORIGINS.includes(origin))) {
+    res.set('Access-Control-Allow-Origin', origin);
+  } else {
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Max-Age', '86400');
+}
+
+function sendError(res, origin, code, message, status = 400) {
+  setCors(res, origin);
+  res.status(status).json({ error: { code, message } });
+}
+
+function verifyPaystackTransaction(reference) {
+  const paystack = require('paystack')(PAYSTACK_SECRET_KEY);
+  return new Promise((resolve, reject) => {
+    paystack.transaction.verify(reference, (err, response) => {
+      if (err) return reject(err);
+      resolve(response);
+    });
+  });
+}
+
+exports.deleteSessionHttp = onRequest(
+  { region: 'us-central1', cors: CORS_ORIGINS },
+  async (req, res) => {
+    let origin = req.get('Origin');
+    if (!origin && req.get('Referer')) {
+      try { origin = new URL(req.get('Referer')).origin; } catch { /* ignore */ }
+    }
+    setCors(res, origin);
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      sendError(res, origin, 'invalid-argument', 'Method not allowed', 405);
+      return;
+    }
+
+    try {
+      const authHeader = req.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        sendError(res, origin, 'unauthenticated', 'Authentication required.', 401);
+        return;
+      }
+      const idToken = authHeader.split('Bearer ')[1];
+      const decoded = await admin.auth().verifyIdToken(idToken);
+      const uid = decoded.uid;
+      const customClaims = decoded;
+
+      const body = typeof req.body === 'object' ? req.body : {};
+      const sessionId = body.sessionId;
+
+      if (!sessionId || typeof sessionId !== 'string') {
+        sendError(res, origin, 'invalid-argument', 'A valid sessionId must be provided.', 400);
+        return;
+      }
+
+      const db = admin.firestore();
+      const sessDoc = await db.collection('sessions').doc(sessionId).get();
+
+      if (!sessDoc.exists) {
+        sendError(res, origin, 'not-found', 'Session not found.', 404);
+        return;
+      }
+
+      const sess = sessDoc.data();
+      const isOwner = sess.adminId === uid;
+      const isGlobalAdmin = !!(customClaims.admin === true);
+      if (!isOwner && !isGlobalAdmin) {
+        sendError(res, origin, 'permission-denied', 'Not authorized to delete this session.', 403);
+        return;
+      }
+
+      const totalToDelete = await countSessionDocs(db, sessionId);
+      logger.info(
+        `deleteSession: session ${sessionId} total related docs=${totalToDelete}`,
+        { sessionId, totalToDelete }
+      );
+
+      if (totalToDelete <= BATCH_SIZE) {
+        const deleted = await deleteAllDocsForSession(db, sessionId);
+        logger.info(`deleteSession synchronous deleted ${deleted} docs for session ${sessionId}`);
+        res.status(200).json({
+          result: {
+            success: true,
+            mode: 'synchronous',
+            deleted,
+            message: `Session and ${deleted} related record(s) deleted successfully.`,
+          },
+        });
+        return;
+      }
+
+      const jobId = await enqueueDeletionJob(db, sessionId, uid, totalToDelete);
+      logger.info(`deleteSession enqueued job ${jobId} for session ${sessionId}`);
+      res.status(200).json({
+        result: { jobId, status: 'queued', message: 'Deletion queued for large session.' },
+      });
+    } catch (err) {
+      logger.error('deleteSession error', err);
+      if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error') {
+        sendError(res, origin, 'unauthenticated', 'Invalid or expired token.', 401);
+        return;
+      }
+      setCors(res, origin);
+      res.status(500).json({ error: { code: 'internal', message: 'Server error while deleting session.' } });
+    }
+  }
+);
+
+// Worker: process deletion jobs
+exports.processDeletionJob = onDocumentCreated(
+  { document: 'deletionJobs/{jobId}', region: 'us-central1' },
+  async (event) => {
+  const jobId = event.params.jobId;
+  const jobData = event.data;
+  logger.info('processDeletionJob started', { jobId, jobData });
+
+  const db = admin.firestore();
+  const jobRef = db.collection('deletionJobs').doc(jobId);
+
+  // If job has already been processed or started, skip
+  const jobSnap = await jobRef.get();
+  if (!jobSnap.exists) return null;
+  const job = jobSnap.data();
+  if (job.status && job.status !== 'pending') {
+    logger.info('processDeletionJob skipping non-pending job', { jobId, status: job.status });
+    return null;
+  }
+
+  try {
+    await jobRef.update({ status: 'processing', lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+    let totalProcessed = job.processedCount || 0;
+    // Loop and process chunks until none left or we've processed totalCount
+    while (true) {
+      const deletedFromLogs = await deleteChunkFrom(db, 'attendanceLogs', job.sessionId);
+      const deletedFromRecords = await deleteChunkFrom(db, 'attendanceRecords', job.sessionId);
+      const numDeleted = deletedFromLogs + deletedFromRecords;
+      if (!numDeleted) break;
+      totalProcessed += numDeleted;
+      await jobRef.update({ processedCount: totalProcessed, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+      // guard against long-running functions by checking time left is not possible here; rely on function timeouts
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    /* eslint-enable no-constant-condition */
+
+    // Delete session doc itself
+    await db.collection('sessions').doc(job.sessionId).delete();
+    await jobRef.update({ processedCount: totalProcessed, status: 'completed', lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+    logger.info('processDeletionJob completed', { jobId, totalProcessed });
+    return null;
+  } catch (err) {
+    logger.error('processDeletionJob failed', { jobId, err });
+    await jobRef.update({ status: 'failed', error: err.message, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    return null;
+  }
+  }
+);
+
+// NEW FUNCTION - validate QR attendance (called from client with QR data, sessionId, location, deviceToken)
+exports.validateQRAttendance = onCall(
+  { cors: true, region: 'us-central1' }, 
+  async (request) => {
+    const { sessionId, location, deviceToken } = request.data;
+    
+    // 1. Auth check
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const uid = request.auth.uid;
+    
+    const db = admin.firestore();
+    
+    // 2. Verify session belongs to user
+    const sessionSnap = await db.collection('sessions').doc(sessionId).get();
+    if (!sessionSnap.exists) {
+      throw new HttpsError('not-found', 'Session not found');
+    }
+    const session = sessionSnap.data();
+    if (session.adminId !== uid) {
+      throw new HttpsError('permission-denied', 'Not session admin');
+    }
+    
+    // 3. QR validation (server-side - assume QR data sent or session.qrSecret)
+    const expectedQR = session.qrSecret || sessionId;  // Your QR logic
+    // If raw image: const qr = new QRCodeReader(); qr.callback = ... (see note)
+    
+    if (!deviceToken || deviceToken !== session.deviceToken) {  // Example check
+      throw new HttpsError('invalid-argument', 'Invalid QR/device');
+    }
+    
+    // 4. Geofence (copy from your server/index.js)
+    if (location && session.geofence) {
+      const R = 6371;
+      const dLat = (session.geofence.latitude - location.latitude) * (Math.PI / 180);
+      // ... full haversine (paste your exact code here)
+    }
+    
+    // 5. Secure write
+    const newRecord = await db.collection('attendanceRecords').add({
+      sessionId,
+      uid,
+      deviceToken,
+      location,
+      validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ip: request.rawRequest.ip  // Anti-spoof
+    });
+    
+    return { 
+      success: true, 
+      message: 'Attendance validated server-side!',
+      recordId: newRecord.id 
+    };
+  }
+);
+
+// Plans (internal - kobo equiv, secure)
+const PLANS = {
+  weekly: { amount: 2099, days: 7 },    // ~GH₵20.99
+  monthly: { amount: 4499, days: 30 }, // ~GH₵44.99
+  annual: { amount: 44999, days: 365 } // ~GH₵449.99
+};
+
+// 1. INIT PAYMENT (HTTP endpoint - POST /initPayment)
+exports.initPaymentHttp = onRequest({ region: 'us-central1' }, async (req, res) => {
+  const origin = req.get('Origin') || (req.get('Referer') && new URL(req.get('Referer')).origin);
+  setCors(res, origin);
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    sendError(res, origin, 'invalid-argument', 'POST only', 405);
+    return;
+  }
+
+  try {
+    const authHeader = req.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      sendError(res, origin, 'unauthenticated', 'Auth header required', 401);
+      return;
+    }
+
+    const idToken = authHeader.split('Bearer ')[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const uid = decoded.uid;
+
+    const { plan, email } = req.body;
+
+    if (!PLANS[plan]) {
+      sendError(res, origin, 'invalid-argument', 'Invalid plan', 400);
+      return;
+    }
+    if (!email) {
+      sendError(res, origin, 'invalid-argument', 'Email required', 400);
+      return;
+    }
+
+    const db = admin.firestore();
+    const reference = `pay_${uid}_${Date.now()}`;
+
+    // Store pending payment
+    await db.collection('payments').doc(reference).set({
+      userId: uid,
+      email,
+      plan,
+      amount: PLANS[plan].amount,
+      status: 'pending',
+      reference,
+      metadata: { userId: uid, plan },
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+// Paystack init - FIXED with logging
+    logger.info('Paystack init starting', { plan, email: email.substring(0, 3)+'...', reference });
+
+    // Paystack init - FIXED: SDK expects callback, not promise
+    logger.info('Paystack init starting (callback mode)', { plan, email: email.substring(0, 3)+'...', reference });
+
+    const paystack = require('paystack')(PAYSTACK_SECRET_KEY);
+    
+    const response = await new Promise((resolve, reject) => {
+      paystack.transaction.initialize({
+        amount: PLANS[plan].amount,
+        email,
+        reference,
+        callback_url: `${origin}/payment-success`,
+
+        metadata: { userId: uid, plan }
+      }, (err, response) => {
+        if (err) {
+          logger.error('Paystack initialize callback error', { error: err.message || err });
+          return reject(new Error(`Paystack API error: ${err.message || err}`));
+        }
+        logger.info('Paystack init callback success', { hasData: !!response?.data, ref: reference });
+        if (!response?.data) {
+          logger.error('Paystack callback missing data', { response });
+          return reject(new Error('Invalid Paystack response format'));
+        }
+        resolve(response);
+      });
+    });
+    logger.info('Paystack init final success', { url: response.data.authorization_url?.substring(0, 50)+'...', reference });
+
+    logger.info('Paystack init success', { url: response.data.authorization_url?.substring(0, 50)+'...', reference });
+
+    res.json({
+      authorization_url: response.data.authorization_url,
+      reference,
+      access_code: response.data.access_code
+    });
+  } catch (err) {
+    logger.error('initPaymentHttp error:', { 
+      message: err.message, 
+      stack: err.stack,
+      plan, 
+      uid,
+      hasPaystack: !!paystack 
+    });
+    sendError(res, origin, 'internal', `Payment init failed: ${err.message}`, 500);
+  }
+});
+
+// 2. WEBHOOK (CRITICAL - source of truth)
+exports.paystackWebhook = onRequest({ region: 'us-central1', invoker: 'public' }, async (req, res) => {
+  const origin = req.get('Origin') || req.get('Referer')?.split('/')[2]?.replace('www.', '');
+  setCors(res, origin); // Use your existing setCors function
+
+  if (req.method !== 'POST') {
+    sendError(res, origin, 'invalid-argument', 'POST only', 405);
+    return;
+  }
+
+  try {
+    const hash = crypto.createHmac('sha512', PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body)).digest('hex');
+    if (hash !== req.get('x-paystack-signature')) {
+      sendError(res, origin, 'invalid-argument', 'Invalid signature', 400);
+      return;
+    }
+
+    if (req.body.event !== 'charge.success') {
+      res.status(200).send('OK'); // Ignore other events
+      return;
+    }
+
+    const { reference } = req.body.data;
+    const db = admin.firestore();
+    const paymentRef = db.collection('payments').doc(reference);
+    const paymentSnap = await paymentRef.get();
+
+    if (!paymentSnap.exists || paymentSnap.data().status === 'success') {
+      res.status(200).send('OK'); // Already processed or not found
+      return;
+    }
+
+    // Verify with Paystack
+    let verify;
+    try {
+      verify = await verifyPaystackTransaction(reference);
+    } catch (verifyErr) {
+      logger.error('Paystack verify API error', verifyErr);
+      res.status(400).json({ error: 'Verification service error', reference });
+      return;
+    }
+    const tr = verify.data;
+
+    if (tr.status === 'success' && tr.reference === reference) {
+      const payment = paymentSnap.data();
+      const uid = payment.userId;
+      const planDays = PLANS[payment.plan].days;
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + planDays * 24 * 60 * 60 * 1000);
+
+      // Update payment
+      await paymentRef.update({
+        status: 'success',
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        paystackData: tr
+      });
+
+      // Activate subscription
+      await db.collection('subscriptions').doc(uid).set({
+        plan: payment.plan,
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        trialUsed: true,
+        activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        userId: uid,
+        email: payment.email
+      }, { merge: true });
+    }
+
+    res.status(200).send('OK');
+  } catch (err) {
+    logger.error('Webhook error:', err);
+    res.status(500).send('Error');
+  }
+});
+
+// 3. VERIFY (Frontend UI only - NO activation)
+exports.verifyPayment = onRequest({ region: 'us-central1', invoker: 'public' }, async (req, res) => {
+  const origin = req.get('Origin');
+  setCors(res, origin);
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  const reference = req.path.split('/').pop(); // /verify-payment/{ref}
+  if (!reference) {
+    sendError(res, origin, 'invalid-argument', 'Missing reference', 400);
+    return;
+  }
+
+  try {
+    let paystack;
+    try {
+      paystack = require('paystack')(PAYSTACK_SECRET_KEY);
+    } catch (e) {
+      logger.error('Paystack verifyPayment load error', e);
+      res.status(500).json({ error: 'Service unavailable' });
+      return;
+    }
+
+    let verify;
+    try {
+      verify = await verifyPaystackTransaction(reference);
+      logger.info('verifyPayment success', { reference, status: verify.data?.status });
+    } catch (verifyErr) {
+      logger.error('Paystack verifyPayment API error', verifyErr);
+      res.status(400).json({ error: 'Verification failed', reference });
+      return;
+    }
+    res.json({ status: verify.data.status, reference, amount: verify.data.amount / 100 });
+  } catch (err) {
+    res.status(400).json({ error: 'Verification failed', reference });
+  }
+});
+
+// Subscription functions
+exports.checkSubscriptionStatus = onCall(
+  { cors: true, region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const uid = request.auth.uid;
+    const db = admin.firestore();
+    
+    logger.info('SUB DOC CHECK:', { uid, exists: false });
+    const subRef = db.collection('subscriptions').doc(uid);
+    const subSnap = await subRef.get();
+    
+    logger.info('SUB DOC:', { 
+      uid, 
+      exists: subSnap.exists, 
+      data: subSnap.exists ? subSnap.data() : null,
+      deletedRecently: !subSnap.exists 
+    });
+    
+    if (!subSnap.exists) {
+      return {
+        active: false,
+        plan: 'free',
+        trialUsed: false,
+        subscriptionEnd: null,
+        daysRemaining: null
+      };
+    }
+    
+    const data = subSnap.data();
+    const now = new Date();
+    const expiresAt = data.expiresAt ? new Date(data.expiresAt.seconds * 1000) : null;
+    const active = expiresAt && expiresAt > now;
+    const daysRemaining = active ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
+    
+    return {
+      active,
+      plan: data.plan || 'free',
+      trialUsed: !!data.trialUsed,
+      subscriptionEnd: data.expiresAt,
+      daysRemaining
+    };
+  }
+);
+
+exports.activateFreeTrial = onCall(
+  { cors: true, region: 'us-central1' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Must be logged in');
+    }
+    const uid = request.auth.uid;
+    const db = admin.firestore();
+    
+    // Get user info from Firebase Auth
+    const userRecord = await admin.auth().getUser(uid);
+    
+    const subRef = db.collection('subscriptions').doc(uid);
+    const subSnap = await subRef.get();
+    
+    if (subSnap.exists && subSnap.data().trialUsed) {
+      throw new HttpsError('failed-precondition', 'Free trial already used');
+    }
+    
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000); // 21 days
+    
+    logger.info('CREATING TRIAL SUBSCRIPTION:', { uid });
+    await subRef.set({
+      plan: 'trial',
+      trialUsed: true,
+      expiresAt: admin.firestore.Timestamp.fromDate(trialEnd),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      userId: uid,
+      email: userRecord.email,
+      displayName: userRecord.displayName || userRecord.email
+    }, { merge: true });
+    
+    return {
+      active: true,
+      plan: 'trial',
+      trialUsed: true,
+      subscriptionEnd: admin.firestore.Timestamp.fromDate(trialEnd),
+      daysRemaining: 21
+    };
+  }
+);
+
+/* DISABLED: activateSubscription - insecure, use webhook only 
+exports.activateSubscription = onCall(
+  { cors: true, region: 'us-central1' },
+  async (request) => {
+    throw new HttpsError('permission-denied', 'Direct activation disabled. Use payment webhook only.');
+  }
+);
+*/
+
+// Admin role assignment - only admins can assign admins
+exports.setAdminClaims = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  if (!isAdmin(request.auth.token)) {
+    throw new HttpsError('permission-denied', 'Only admins can assign admin roles');
+  }
+
+  const { uid } = request.data;
+
+  if (!uid) {
+    throw new HttpsError('invalid-argument', 'UID required');
+  }
+
+  await admin.auth().setCustomUserClaims(uid, { admin: true });
+
+  // Note: Client must call getIdToken(true) to refresh claims
+  return { success: true, message: `Admin claims set for ${uid}. Refresh token on client.` };
+});
+

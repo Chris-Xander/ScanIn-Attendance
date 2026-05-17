@@ -1,0 +1,104 @@
+/* User Agreement Styles */
+.user-agreement-main {
+  min-height: 100vh;
+  background: linear-gradient(120deg, #fbfaf9 0%, #0084f0 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 0 1rem;
+}
+
+.user-agreement-header {
+  text-align: center;
+  margin-top: 2.5rem;
+  margin-bottom: 2rem;
+  max-width: 800px;
+}
+
+.user-agreement-header h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #195d95;
+  margin-bottom: 1rem;
+  letter-spacing: 1px;
+}
+
+.user-agreement-header p {
+  font-size: 1rem;
+  color: #1769aa;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.user-agreement-content {
+  max-width: 800px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(33, 150, 243, 0.1);
+  padding: 2rem;
+  margin-bottom: 3rem;
+}
+
+.user-agreement-content section {
+  margin-bottom: 2rem;
+}
+
+.user-agreement-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1976d2;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #e3f2fd;
+  padding-bottom: 0.5rem;
+}
+
+.user-agreement-content p {
+  color: #444;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.user-agreement-content ul {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.user-agreement-content li {
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+.user-agreement-content strong {
+  color: #1976d2;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .user-agreement-header h1 {
+    font-size: 2rem;
+  }
+
+  .user-agreement-content {
+    padding: 1.5rem;
+  }
+
+  .user-agreement-content h2 {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .user-agreement-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .user-agreement-content {
+    padding: 1rem;
+  }
+
+  .user-agreement-content h2 {
+    font-size: 1.2rem;
+  }
+}
